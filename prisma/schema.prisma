@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  REQUESTER
+  AGENT
+  TEAM_LEAD
+  ADMIN
+}
+
+enum TicketStatus {
+  NEW
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TicketType {
+  INCIDENT
+  REQUEST
+}
+
+enum CommentSource {
+  WEB
+  EMAIL
+  AI_DRAFT
+}
+
+model Team {
+  id         String       @id @default(cuid())
+  name       String       @unique
+  categories Category[]
+  members    TeamMember[]
+  tickets    Ticket[]
+}
+
+model Category {
+  id            String     @id @default(cuid())
+  name          String
+  parentId      String?
+  parent        Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children      Category[] @relation("CategoryTree")
+  defaultTeamId String?
+  defaultTeam   Team?      @relation(fields: [defaultTeamId], references: [id])
+  tickets       Ticket[]
+
+  @@unique([name, parentId])
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String?
+  role         Role
+  active       Boolean   @default(true)
+  failedLogins Int       @default(0)
+  lockedUntil  DateTime?
+  createdAt    DateTime  @default(now())
+
+  sessions       Session[]
+  teams          TeamMember[]
+  invitesCreated Invite[]
+  passwordResets PasswordReset[]
+  requested      Ticket[]        @relation("Requester")
+  assigned       Ticket[]        @relation("Assignee")
+  comments       Comment[]
+  attachments    Attachment[]
+  events         TicketEvent[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Invite {
+  id          String    @id @default(cuid())
+  email       String
+  role        Role
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model TeamMember {
+  userId String
+  teamId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@id([userId, teamId])
+}
+
+model Ticket {
+  id          String       @id @default(cuid())
+  number      Int          @unique @default(autoincrement())
+  title       String
+  description String
+  status      TicketStatus @default(NEW)
+  priority    Priority     @default(MEDIUM)
+  type        TicketType   @default(REQUEST)
+  requesterId String
+  requester   User         @relation("Requester", fields: [requesterId], references: [id])
+  assigneeId  String?
+  assignee    User?        @relation("Assignee", fields: [assigneeId], references: [id])
+  teamId      String?
+  team        Team?        @relation(fields: [teamId], references: [id])
+  categoryId  String?
+  category    Category?    @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  resolvedAt  DateTime?
+  closedAt    DateTime?
+
+  comments    Comment[]
+  attachments Attachment[]
+  events      TicketEvent[]
+
+  @@index([status, teamId, assigneeId])
+  @@index([createdAt])
+  @@index([requesterId])
+}
+
+model Comment {
+  id        String        @id @default(cuid())
+  ticketId  String
+  ticket    Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User          @relation(fields: [authorId], references: [id])
+  body      String
+  internal  Boolean       @default(false)
+  source    CommentSource @default(WEB)
+  createdAt DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  ticketId   String
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  uploaderId String
+  uploader   User     @relation(fields: [uploaderId], references: [id])
+  filename   String
+  storedName String   @unique
+  mimeType   String
+  size       Int
+  createdAt  DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+model TicketEvent {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actorId   String
+  actor     User     @relation(fields: [actorId], references: [id])
+  type      String
+  data      Json
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
