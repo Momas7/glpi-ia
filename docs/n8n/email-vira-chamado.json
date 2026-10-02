@@ -1,0 +1,66 @@
+{
+  "name": "Chamados IA — e-mail vira chamado",
+  "nodes": [
+    {
+      "id": "b1f0b6a2-0001-4c9e-9a10-000000000001",
+      "name": "Caixa de suporte (IMAP)",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "parameters": {
+        "mailbox": "INBOX",
+        "postProcessAction": "read",
+        "format": "resolved",
+        "options": { "customEmailConfig": "[\"UNSEEN\"]" }
+      },
+      "credentials": { "imap": { "id": "", "name": "Caixa de suporte" } }
+    },
+    {
+      "id": "b1f0b6a2-0002-4c9e-9a10-000000000002",
+      "name": "Não é resposta automática?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [260, 0],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ ($json.headers['auto-submitted'] || 'no').toLowerCase() }}",
+              "rightValue": "no",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "leftValue": "={{ ($json.headers['precedence'] || '').toLowerCase() }}",
+              "rightValue": "^(bulk|auto_reply|list)$",
+              "operator": { "type": "string", "operation": "notRegex" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b1f0b6a2-0003-4c9e-9a10-000000000003",
+      "name": "Abrir chamado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [520, -100],
+      "parameters": {
+        "method": "POST",
+        "url": "https://chamados.suaempresa.com/api/v1/tickets",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ requesterEmail: $json.from.value[0].address, title: ($json.subject || 'Sem assunto').slice(0, 200), description: ($json.text || '(e-mail sem texto)').slice(0, 10000), externalRef: $json.messageId }) }}",
+        "options": { "response": { "response": { "neverError": true, "fullResponse": true } } }
+      },
+      "credentials": { "httpHeaderAuth": { "id": "", "name": "Chamados IA — chave de API" } }
+    }
+  ],
+  "connections": {
+    "Caixa de suporte (IMAP)": { "main": [[{ "node": "Não é resposta automática?", "type": "main", "index": 0 }]] },
+    "Não é resposta automática?": { "main": [[{ "node": "Abrir chamado", "type": "main", "index": 0 }], []] }
+  },
+  "settings": { "saveDataSuccessExecution": "none" }
+}
