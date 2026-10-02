@@ -26,6 +26,8 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       AI_ENABLED: ${AI_ENABLED:-false}
       UPLOAD_DIR: /data/uploads
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
+      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:-}
     volumes:
       - uploads:/data/uploads
     ports:

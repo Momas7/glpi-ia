@@ -36,7 +36,8 @@ export default async function IntegrationsPage() {
         ) : (
           <p className="text-sm text-muted-foreground">
             Não configurado: defina <code>N8N_WEBHOOK_URL</code> e <code>N8N_WEBHOOK_SECRET</code> no ambiente. Sem isso os
-            avisos só vão para o log.
+            avisos só vão para o log e <strong>os links de redefinição de senha não chegam a ninguém</strong> (convites
+            continuam funcionando pelo link exibido ao admin).
           </p>
         )}
       </section>

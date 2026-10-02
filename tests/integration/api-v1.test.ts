@@ -127,6 +127,14 @@ describe("POST /api/v1/tickets/{number}/comments", () => {
     expect([comments[0].source, comments[0].internal]).toEqual(["API", false]);
   });
 
+  it("pela API só o solicitante comenta: admin ou técnico da equipe recebem 403", async () => {
+    const t = await ticketOfAna();
+    const agentUser = await db.user.create({ data: { name: "Téc", email: "tec@x.com", role: "AGENT", teams: { create: [{ teamId: intakeTeam }] } } });
+    expect((await call("comments", fullKey, { authorEmail: "admin@x.com", body: "Redefina sua senha aqui" }, t.number)).status).toBe(403);
+    expect((await call("comments", fullKey, { authorEmail: agentUser.email, body: "Oi" }, t.number)).status).toBe(403);
+    expect((await call("comments", fullKey, { authorEmail: "ana@x.com", body: "Oi" }, t.number)).status).toBe(201);
+  });
+
   it("autor sem acesso → 403; chamado inexistente → 404; chave sem escopo → 403", async () => {
     const t = await ticketOfAna();
     expect((await call("comments", fullKey, { authorEmail: "bia@x.com", body: "Oi" }, t.number)).status).toBe(403);

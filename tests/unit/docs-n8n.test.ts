@@ -35,6 +35,29 @@ describe("guia de integração com o n8n", () => {
     expect(http.parameters.method).toBe("POST");
   });
 
+  it("workflow: filtros extraem o valor do cabeçalho e cobrem respostas automáticas e listas", () => {
+    const wf = JSON.parse(readFileSync("docs/n8n/email-vira-chamado.json", "utf8"));
+    const filter = JSON.stringify(wf.nodes.find((n: { type: string }) => n.type === "n8n-nodes-base.if").parameters);
+    expect(filter).toContain("split(':')");
+    for (const h of ["auto-submitted", "precedence", "x-autoreply", "list-id"]) expect(filter.toLowerCase(), h).toContain(h);
+  });
+
+  it("workflow: falha da API não passa em silêncio (422 responde ao remetente, outros erros param a execução)", () => {
+    const wf = JSON.parse(readFileSync("docs/n8n/email-vira-chamado.json", "utf8"));
+    const types = wf.nodes.map((n: { type: string }) => n.type);
+    expect(types).toContain("n8n-nodes-base.emailSend");
+    expect(types).toContain("n8n-nodes-base.stopAndError");
+    const http = wf.nodes.find((n: { type: string }) => n.type === "n8n-nodes-base.httpRequest");
+    expect(http.retryOnFail).toBe(true);
+    expect(http.parameters.jsonBody).toContain("E-mail: ");
+  });
+
+  it("guia: requisitos do n8n e riscos documentados", () => {
+    for (const text of ["NODE_FUNCTION_ALLOW_BUILTIN", "N8N_BLOCK_ENV_ACCESS_IN_NODE", "When Last Node Finishes", "SPF", "DKIM"]) {
+      expect(doc, text).toContain(text);
+    }
+  });
+
   it("o guia documenta todos os eventos e os erros da API", () => {
     for (const ev of ["ticket.created", "ticket.assigned", "ticket.status_changed", "comment.created", "sla.warning", "sla.breached", "auth.invite_created", "auth.password_reset_requested"]) {
       expect(doc, ev).toContain(`\`${ev}\``);

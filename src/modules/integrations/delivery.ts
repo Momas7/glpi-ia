@@ -1,17 +1,15 @@
 import { getDb } from "@/lib/db";
 import { AppError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { defineQueue, enqueue, registerHandler, type PrismaTransaction } from "@/lib/queue";
+import { enqueue, registerHandler, type PrismaTransaction } from "@/lib/queue";
 // Imports diretos (não pelo index de auth) evitam ciclo: auth usa emitEvent deste módulo.
 import { can } from "@/modules/auth/can";
 import type { SessionUser } from "@/modules/auth/session";
-import { DELIVER_QUEUE, ticketEventData, type DeliverJob } from "./events";
+import { ticketEventData, type DeliverJob } from "./events";
+import { DELIVER_QUEUE, FAILED_QUEUE, ensureWebhookQueues } from "./queues";
 import { signPayload } from "./signature";
 
-const FAILED_QUEUE = "webhook.failed";
 const TIMEOUT_MS = 10_000;
-// Os corpos de convite/reset levam links com token: nada de webhook fica mais de 1 h nas tabelas do pg-boss.
-const JOB_RETENTION_SECONDS = 3600;
 
 /** Uma tentativa de entrega. Falha (status ≠ 2xx, erro de rede ou timeout) lança para o pg-boss tentar de novo. */
 export async function deliverWebhook(job: DeliverJob): Promise<void> {
@@ -56,14 +54,7 @@ async function markFailed(job: DeliverJob): Promise<void> {
 
 /** Define as filas de entrega (8 tentativas com intervalo exponencial, depois dead letter) e registra os handlers. */
 export async function registerWebhookQueues(opts: { retryLimit?: number; retryDelay?: number } = {}): Promise<void> {
-  await defineQueue(FAILED_QUEUE, { deleteAfterSeconds: JOB_RETENTION_SECONDS, retryLimit: 3 });
-  await defineQueue(DELIVER_QUEUE, {
-    retryLimit: opts.retryLimit ?? 7,
-    retryDelay: opts.retryDelay ?? 30,
-    retryBackoff: true,
-    deleteAfterSeconds: JOB_RETENTION_SECONDS,
-    deadLetter: FAILED_QUEUE,
-  });
+  await ensureWebhookQueues(opts);
   await registerHandler<DeliverJob>(DELIVER_QUEUE, deliverWebhook);
   await registerHandler<DeliverJob>(FAILED_QUEUE, markFailed);
 }

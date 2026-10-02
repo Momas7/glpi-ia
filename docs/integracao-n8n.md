@@ -5,6 +5,14 @@ O sistema conversa com o n8n nos dois sentidos:
 - **Saída:** a cada acontecimento relevante (chamado criado, atribuído, mudança de status, comentário público, convite, redefinição de senha), o sistema envia um aviso assinado para um webhook do n8n. O n8n decide o canal: e-mail, Teams, WhatsApp etc.
 - **Entrada:** o n8n abre chamados e comenta neles por uma API com chave própria. Uma automação de e-mail, formulário ou WhatsApp vira chamado sem mudar nada no sistema.
 
+## Requisitos no n8n (self-hosted)
+
+- O nó Code precisa do módulo `crypto` para verificar a assinatura: defina `NODE_FUNCTION_ALLOW_BUILTIN=crypto` no ambiente do n8n.
+- Para ler o segredo com `$env`, o acesso a variáveis de ambiente no nó Code precisa estar liberado (`N8N_BLOCK_ENV_ACCESS_IN_NODE=false`). Se a sua política não permitir, guarde o segredo de outra forma aceita pela sua instalação (por exemplo, Variables) e ajuste o trecho.
+- No nó **Webhook**, use **Respond: When Last Node Finishes** (ou um nó *Respond to Webhook* depois da verificação). Assim, assinatura inválida ou erro no workflow devolvem um código diferente de 2xx e o sistema tenta de novo. Com a resposta imediata, o sistema marca o aviso como entregue mesmo que o workflow quebre depois.
+
+Na tela de integrações, **entregue** significa "o n8n respondeu 2xx". Com a configuração acima, isso equivale a "o workflow processou".
+
 ## Configuração
 
 1. No n8n, crie um workflow com um nó **Webhook** (método `POST`). Em *Options*, ligue **Raw Body**: a assinatura é calculada sobre o corpo exato.
@@ -13,7 +21,7 @@ O sistema conversa com o n8n nos dois sentidos:
    - `N8N_WEBHOOK_SECRET`: um segredo com pelo menos 32 caracteres (`openssl rand -hex 32`). O mesmo valor vai no nó de verificação do n8n.
 3. Para a entrada, em **Administração → Integrações**, crie uma chave de API com as permissões necessárias e copie o valor exibido (ele não aparece de novo).
 
-Sem `N8N_WEBHOOK_URL`, os avisos só vão para o log do servidor.
+Sem `N8N_WEBHOOK_URL`, os avisos só vão para o log do servidor, e **os links de redefinição de senha não chegam a ninguém**. Com Docker Compose, as duas variáveis vão no `.env` do projeto; o `docker-compose.yml` já as repassa ao `web` e ao `worker`.
 
 ## Avisos (saída)
 
@@ -127,6 +135,7 @@ Permissão da chave: **Abrir chamados** (`tickets:create`).
 ```
 
 - `requesterEmail` precisa ser de uma pessoa **cadastrada e ativa** (maiúsculas não importam). O sistema não cria contas a partir de e-mails desconhecidos.
+- **O remetente de um e-mail pode ser forjado.** Em fluxos de e-mail, confira o cabeçalho `Authentication-Results` (SPF, DKIM e DMARC com `pass`) antes de chamar a API; sem isso, qualquer pessoa pode abrir chamado em nome de um colega.
 - `categoryName` é opcional; uma categoria inexistente é ignorada e o chamado vai para a equipe de entrada.
 - `priority`: `LOW`, `MEDIUM`, `HIGH` ou `CRITICAL` (opcional).
 - `externalRef` torna a chamada **idempotente**: repetir o mesmo valor com a mesma chave devolve o chamado já criado, em vez de duplicar. Use o Message-ID do e-mail ou o id da mensagem de origem.
@@ -141,7 +150,7 @@ Permissão da chave: **Comentar em chamados** (`comments:create`).
 { "authorEmail": "ana@empresa.com", "body": "Segue o print do erro.", "externalRef": "<CAF9.456@mail.empresa.com>" }
 ```
 
-O autor precisa poder comentar naquele chamado (o próprio solicitante ou a equipe responsável). Comentários pela API são sempre públicos. `externalRef` repetido no mesmo chamado devolve `200` sem duplicar.
+Pela API, **só o solicitante do chamado** pode ser o autor: comentários de técnicos e administradores são feitos pela tela. Isso impede que um integrador (ou um e-mail com remetente forjado) publique comentário em nome da equipe. Comentários pela API são sempre públicos. `externalRef` repetido no mesmo chamado devolve `200` sem duplicar.
 
 ### Erros
 
@@ -149,7 +158,7 @@ O autor precisa poder comentar naquele chamado (o próprio solicitante ou a equi
 |---|---|
 | 400 | Corpo inválido (campos faltando ou fora do formato); a resposta lista os campos. |
 | 401 | Chave ausente, inválida ou revogada. |
-| 403 | A chave não tem a permissão necessária, ou o autor não pode comentar no chamado. |
+| 403 | A chave não tem a permissão necessária, ou o autor do comentário não é o solicitante do chamado. |
 | 404 | Chamado não encontrado (comentários). |
 | 413 | Corpo maior que 64 KB. |
 | 422 | `{"error": "requester_not_found"}`: solicitante não cadastrado ou desativado. Responda ao remetente pedindo que use o e-mail cadastrado. |
@@ -159,8 +168,11 @@ O autor precisa poder comentar naquele chamado (o próprio solicitante ou a equi
 
 O arquivo [`docs/n8n/email-vira-chamado.json`](n8n/email-vira-chamado.json) pode ser importado no n8n (*Import from File*). Ele:
 
-1. Lê a caixa de suporte por IMAP.
-2. Descarta respostas automáticas (cabeçalhos `Auto-Submitted` diferente de `no` ou `Precedence: bulk/auto_reply/list`), o que evita loops com mensagens de férias.
-3. Chama `POST /api/v1/tickets` com o remetente como solicitante e o Message-ID como `externalRef`.
+1. Lê a caixa de suporte por IMAP (marcando a mensagem como lida).
+2. Descarta respostas automáticas e listas: `Auto-Submitted` diferente de `no`, `Precedence` `bulk`/`auto_reply`/`list`/`junk`, presença de `X-Autoreply`, `X-Autorespond`, `List-Id` ou `X-Auto-Response-Suppress`, e remetentes `mailer-daemon`, `postmaster` e `noreply`. Isso evita loops com mensagens de férias e com os próprios avisos do sistema.
+3. Chama `POST /api/v1/tickets` com o remetente como solicitante, título `E-mail: <assunto>` e o Message-ID como `externalRef`. Falhas de rede, 429 e 5xx são tentadas de novo 3 vezes.
+4. Se ainda assim falhar: com `422`, responde ao remetente explicando que o e-mail não está cadastrado; com qualquer outro erro, a execução para com erro.
 
-Antes de ativar, ajuste a credencial IMAP, a URL do servidor e a credencial *Header Auth* com `Authorization: Bearer <sua chave>`.
+Como a mensagem já foi marcada como lida, **configure um Error Workflow** nas opções do workflow para avisar a equipe quando uma execução falhar; senão o e-mail se perde em silêncio. Os nós de IF leem os cabeçalhos no formato `Nome: valor` que o nó IMAP entrega; confira numa execução real da sua versão do n8n.
+
+Antes de ativar, ajuste as credenciais IMAP e SMTP, o remetente da resposta, a URL do servidor e a credencial *Header Auth* com `Authorization: Bearer <sua chave>`.

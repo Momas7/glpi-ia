@@ -17,7 +17,7 @@
     },
     {
       "id": "b1f0b6a2-0002-4c9e-9a10-000000000002",
-      "name": "Não é resposta automática?",
+      "name": "Não é resposta automática nem lista?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [260, 0],
@@ -26,13 +26,23 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ ($json.headers['auto-submitted'] || 'no').toLowerCase() }}",
+              "leftValue": "={{ (($json.headers['auto-submitted'] || 'Auto-Submitted: no').split(':').slice(1).join(':').trim().toLowerCase()) }}",
               "rightValue": "no",
               "operator": { "type": "string", "operation": "equals" }
             },
             {
-              "leftValue": "={{ ($json.headers['precedence'] || '').toLowerCase() }}",
-              "rightValue": "^(bulk|auto_reply|list)$",
+              "leftValue": "={{ (($json.headers['precedence'] || '').split(':').slice(1).join(':').trim().toLowerCase()) }}",
+              "rightValue": "^(bulk|auto_reply|list|junk)$",
+              "operator": { "type": "string", "operation": "notRegex" }
+            },
+            {
+              "leftValue": "={{ !$json.headers['x-autoreply'] && !$json.headers['x-autorespond'] && !$json.headers['list-id'] && !$json.headers['x-auto-response-suppress'] }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            },
+            {
+              "leftValue": "={{ ($json.from.value[0].address || '').toLowerCase() }}",
+              "rightValue": "^(mailer-daemon|postmaster|no-?reply)@",
               "operator": { "type": "string", "operation": "notRegex" }
             }
           ]
@@ -45,6 +55,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [520, -100],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
       "parameters": {
         "method": "POST",
         "url": "https://chamados.suaempresa.com/api/v1/tickets",
@@ -52,15 +66,66 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ requesterEmail: $json.from.value[0].address, title: ($json.subject || 'Sem assunto').slice(0, 200), description: ($json.text || '(e-mail sem texto)').slice(0, 10000), externalRef: $json.messageId }) }}",
-        "options": { "response": { "response": { "neverError": true, "fullResponse": true } } }
+        "jsonBody": "={{ JSON.stringify({ requesterEmail: $json.from.value[0].address, title: ('E-mail: ' + ($json.subject || 'sem assunto')).slice(0, 200), description: ($json.text || '(e-mail sem texto)').slice(0, 10000), externalRef: $json.messageId }) }}",
+        "options": {}
       },
       "credentials": { "httpHeaderAuth": { "id": "", "name": "Chamados IA — chave de API" } }
+    },
+    {
+      "id": "b1f0b6a2-0004-4c9e-9a10-000000000004",
+      "name": "Remetente não cadastrado (422)?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [780, 60],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ String($json.error?.httpCode ?? $json.error?.status ?? '') }}",
+              "rightValue": "422",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b1f0b6a2-0005-4c9e-9a10-000000000005",
+      "name": "Responder ao remetente",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1040, -20],
+      "parameters": {
+        "fromEmail": "suporte@suaempresa.com",
+        "toEmail": "={{ $('Caixa de suporte (IMAP)').item.json.from.value[0].address }}",
+        "subject": "={{ 'Re: ' + ($('Caixa de suporte (IMAP)').item.json.subject || 'seu e-mail') }}",
+        "emailFormat": "text",
+        "text": "Recebemos sua mensagem, mas não encontramos este endereço no cadastro do sistema de chamados. Escreva a partir do seu e-mail corporativo cadastrado ou abra o chamado pelo portal."
+      },
+      "credentials": { "smtp": { "id": "", "name": "SMTP do suporte" } }
+    },
+    {
+      "id": "b1f0b6a2-0006-4c9e-9a10-000000000006",
+      "name": "Falha ao abrir chamado",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [1040, 140],
+      "parameters": {
+        "errorMessage": "={{ 'Não foi possível abrir o chamado do e-mail ' + $('Caixa de suporte (IMAP)').item.json.messageId + ': ' + ($json.error?.message ?? 'erro desconhecido') }}"
+      }
     }
   ],
   "connections": {
-    "Caixa de suporte (IMAP)": { "main": [[{ "node": "Não é resposta automática?", "type": "main", "index": 0 }]] },
-    "Não é resposta automática?": { "main": [[{ "node": "Abrir chamado", "type": "main", "index": 0 }], []] }
+    "Caixa de suporte (IMAP)": { "main": [[{ "node": "Não é resposta automática nem lista?", "type": "main", "index": 0 }]] },
+    "Não é resposta automática nem lista?": { "main": [[{ "node": "Abrir chamado", "type": "main", "index": 0 }], []] },
+    "Abrir chamado": { "main": [[], [{ "node": "Remetente não cadastrado (422)?", "type": "main", "index": 0 }]] },
+    "Remetente não cadastrado (422)?": {
+      "main": [
+        [{ "node": "Responder ao remetente", "type": "main", "index": 0 }],
+        [{ "node": "Falha ao abrir chamado", "type": "main", "index": 0 }]
+      ]
+    }
   },
-  "settings": { "saveDataSuccessExecution": "none" }
+  "settings": { "saveDataSuccessExecution": "none", "errorWorkflow": "" }
 }

@@ -67,7 +67,11 @@ export async function addCommentFromApi(
   const ticket = await getDb().ticket.findUnique({ where: { number: ticketNumber } });
   if (!ticket) throw new NotFoundError("Chamado não encontrado.");
   const author = await activeUserByEmail(input.authorEmail);
-  if (!author || !can(author, "comment:create", ticket)) throw new AppError(403, "O autor não pode comentar neste chamado.");
+  // Pela API (ex.: resposta de e-mail, cujo remetente pode ser forjado) só o solicitante comenta: um integrador
+  // não pode publicar comentário público "assinado" por admin ou técnico.
+  if (!author || author.id !== ticket.requesterId || !can(author, "comment:create", ticket)) {
+    throw new AppError(403, "Pela API, só o solicitante do chamado pode comentar.");
+  }
 
   const existing = () =>
     input.externalRef

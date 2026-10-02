@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "@/generated/prisma/client";
 import { logger } from "@/lib/logger";
 import { enqueue, type PrismaTransaction } from "@/lib/queue";
+import { DELIVER_QUEUE, ensureWebhookQueues } from "./queues";
 
 export type EventType =
   | "ticket.created"
@@ -13,7 +14,7 @@ export type EventType =
   | "auth.invite_created"
   | "auth.password_reset_requested";
 
-export const DELIVER_QUEUE = "webhook.deliver";
+export { DELIVER_QUEUE };
 
 export interface DeliverJob {
   deliveryId: string;
@@ -34,6 +35,7 @@ export async function emitEvent(
     logger.info({ type, ...ref }, "evento sem destino (N8N_WEBHOOK_URL ausente)");
     return null;
   }
+  await ensureWebhookQueues();
   const eventId = randomUUID();
   const body = JSON.stringify({ id: eventId, type, occurredAt: new Date().toISOString(), data });
   const delivery = await tx.webhookDelivery.create({

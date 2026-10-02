@@ -51,4 +51,9 @@ describe("loadConfig", () => {
     ).toBe("http://n8n.local/webhook/x");
     expect(() => loadConfig({ ...base, N8N_WEBHOOK_URL: "nao-e-url", N8N_WEBHOOK_SECRET: "s".repeat(32) })).toThrowError(/N8N_WEBHOOK_URL/);
   });
+
+  it("N8N vazios (como o Compose repassa quando não definidos) contam como ausentes", () => {
+    const c = loadConfig({ ...base, N8N_WEBHOOK_URL: "", N8N_WEBHOOK_SECRET: "" });
+    expect(c.N8N_WEBHOOK_URL).toBeUndefined();
+  });
 });
