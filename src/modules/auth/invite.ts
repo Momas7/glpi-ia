@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { recordAudit } from "@/modules/audit";
 import { hashPassword, validatePasswordPolicy } from "./password";
 import { hashToken, type Role } from "./session";
 import { appUrl, newToken } from "./tokens";
@@ -16,14 +17,24 @@ export async function createInvite(input: {
     throw new Error("Somente administradores podem criar convites.");
   }
   const { token, tokenHash } = newToken();
-  await db.invite.create({
-    data: {
-      email: input.email.trim().toLowerCase(),
-      role: input.role,
-      tokenHash,
-      expiresAt: new Date(Date.now() + INVITE_TTL_MS),
-      createdById: input.createdById,
-    },
+  const email = input.email.trim().toLowerCase();
+  const now = new Date();
+  await db.$transaction(async (tx) => {
+    // Um convite novo substitui os pendentes do mesmo e-mail (ex.: papel escolhido errado no primeiro).
+    await tx.invite.updateMany({
+      where: { email, usedAt: null, revokedAt: null, expiresAt: { gt: now } },
+      data: { revokedAt: now },
+    });
+    const invite = await tx.invite.create({
+      data: { email, role: input.role, tokenHash, expiresAt: new Date(now.getTime() + INVITE_TTL_MS), createdById: input.createdById },
+    });
+    await recordAudit(tx, {
+      actorId: input.createdById,
+      action: "user.invite",
+      targetType: "invite",
+      targetId: invite.id,
+      data: { email, role: input.role },
+    });
   });
   return { token, inviteUrl: `${appUrl()}/accept-invite?token=${token}` };
 }
@@ -37,13 +48,13 @@ export async function acceptInvite(input: {
   if (!validatePasswordPolicy(input.password).ok) return { ok: false };
   const db = getDb();
   const invite = await db.invite.findUnique({ where: { tokenHash: hashToken(input.token) } });
-  if (!invite || invite.usedAt || invite.expiresAt <= new Date()) return { ok: false };
+  if (!invite || invite.usedAt || invite.revokedAt || invite.expiresAt <= new Date()) return { ok: false };
   const passwordHash = await hashPassword(input.password);
 
   try {
     return await db.$transaction(async (tx) => {
       const claimed = await tx.invite.updateMany({
-        where: { id: invite.id, usedAt: null },
+        where: { id: invite.id, usedAt: null, revokedAt: null },
         data: { usedAt: new Date() },
       });
       if (claimed.count !== 1) return { ok: false };
