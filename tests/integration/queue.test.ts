@@ -59,3 +59,18 @@ describe("fila pg-boss", () => {
     await vi.waitFor(() => expect(handler).toHaveBeenCalledWith({ n: 2 }), { timeout: 5000 });
   });
 });
+
+describe("recuperação de falha no start", () => {
+  it("volta a funcionar depois que um start falhou (promise rejeitada não fica em cache)", async () => {
+    await stopQueue();
+    const valid = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = "postgresql://x:y@127.0.0.1:1/none";
+    await expect(enqueue("system.recover", {})).rejects.toThrow();
+
+    process.env.DATABASE_URL = valid;
+    const handler = vi.fn(async () => {});
+    await registerHandler("system.recover", handler);
+    await enqueue("system.recover", { ok: true });
+    await vi.waitFor(() => expect(handler).toHaveBeenCalledWith({ ok: true }), { timeout: 8000 });
+  });
+});

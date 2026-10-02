@@ -39,3 +39,10 @@ export function getConfig(): Config {
   cached ??= loadConfig(process.env);
   return cached;
 }
+
+/** Para módulos que só precisam do banco (db, queue): falha cedo e com mensagem clara. */
+export function requireDatabaseUrl(env: Record<string, string | undefined>): string {
+  const url = env.DATABASE_URL;
+  if (!url) throw new Error("Configuração de ambiente inválida: DATABASE_URL não definida");
+  return url;
+}

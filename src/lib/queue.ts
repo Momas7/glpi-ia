@@ -1,4 +1,5 @@
 import { PgBoss } from "pg-boss";
+import { requireDatabaseUrl } from "@/lib/config";
 import type { Db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
@@ -12,11 +13,18 @@ const ensuredQueues = new Set<string>();
 export function getQueue(): Promise<PgBoss> {
   starting ??= (async () => {
     const instance = new PgBoss({
-      connectionString: process.env.DATABASE_URL ?? "",
+      connectionString: requireDatabaseUrl(process.env),
       schema: "pgboss",
     });
     instance.on("error", (err) => logger.error({ err }, "pg-boss error"));
-    await instance.start();
+    try {
+      await instance.start();
+    } catch (err) {
+      // Não deixa a promise rejeitada em cache: a próxima chamada tenta de novo.
+      starting = undefined;
+      await instance.stop({ graceful: false }).catch(() => {});
+      throw err;
+    }
     boss = instance;
     return instance;
   })();

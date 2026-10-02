@@ -3,10 +3,10 @@ services:
     image: docker.io/pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: glpi
-      POSTGRES_PASSWORD: glpi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
       POSTGRES_DB: glpi_ia
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -20,7 +20,7 @@ services:
       context: .
       target: web
     environment: &app-env
-      DATABASE_URL: postgresql://glpi:glpi@postgres:5432/glpi_ia
+      DATABASE_URL: postgresql://glpi:${POSTGRES_PASSWORD}@postgres:5432/glpi_ia
       SESSION_SECRET: ${SESSION_SECRET:?defina SESSION_SECRET no .env}
       APP_URL: ${APP_URL:-http://localhost:3000}
       LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
