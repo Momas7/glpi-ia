@@ -1,7 +1,6 @@
 node_modules
 .next
 .git
-.superpowers
 .env
 .env.*
 !.env.example

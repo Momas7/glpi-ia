@@ -14,7 +14,7 @@ Sistema de chamados no estilo GLPI com automações de IA: triagem automática, 
 
 ## Arquitetura
 
-Monólito modular com dois processos do mesmo código: `web` (UI e Route Handlers) e `worker` (jobs do pg-boss). Detalhes em [docs/superpowers/specs/2026-10-01-glpi-ia-design.md](docs/superpowers/specs/2026-10-01-glpi-ia-design.md).
+Monólito modular com dois processos do mesmo código: `web` (UI e Route Handlers) e `worker` (jobs do pg-boss). Detalhes em [docs/specs/2026-10-01-glpi-ia-design.md](docs/specs/2026-10-01-glpi-ia-design.md).
 
 ## Rodando localmente
 

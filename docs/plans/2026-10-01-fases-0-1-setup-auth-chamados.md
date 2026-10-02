@@ -1,6 +1,5 @@
 # Fases 0–1: Setup, Auth e CRUD de Chamados — Plano de Implementação
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Entregar a base do sistema (infra, CI, tema) e o núcleo funcional: login por convite com papéis e CRUD de chamados com comentários, anexos, busca e paginação.
 
@@ -8,7 +7,7 @@
 
 **Tech Stack:** Next.js (App Router, Route Handlers), TypeScript, Prisma, PostgreSQL + pgvector + pg_trgm, pg-boss, Zod, argon2, Tailwind, shadcn/ui, React Bits (TS-TW), Vitest, Testcontainers, Playwright, pino, Docker Compose, GitHub Actions.
 
-**Spec:** `docs/superpowers/specs/2026-10-01-glpi-ia-design.md`
+**Spec:** `docs/specs/2026-10-01-glpi-ia-design.md`
 
 Fora deste plano (planos próprios depois): Fase 2 (SLA, equipes avançadas, e-mail, dashboard), Fases 3–5 (IA), Fase 6 (métricas e deploy), importador do GLPI.
 
