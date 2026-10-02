@@ -42,6 +42,8 @@ export const listQuerySchema = z.object({
   teamId: z.string().min(1).optional(),
   assigneeId: z.string().min(1).optional(),
   q: z.string().trim().min(1).max(200).optional(),
+  // Filtros rápidos: atribuídos a mim, da minha equipe, abertos por mim.
+  scope: z.enum(["assigned", "team", "mine"]).optional(),
 });
 
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
