@@ -19,18 +19,19 @@ const updatableFields = {
   type: typeEnum,
   priority: priorityEnum,
   categoryId: z.string().min(1).nullable(),
-  teamId: z.string().min(1).nullable(),
-  assigneeId: z.string().min(1).nullable(),
 };
 
+// Equipe e responsável não são campos editáveis: mudam só por assignTicket/takeTicket.
 export const updateTicketSchema = z
   .object(updatableFields)
+  .strict()
   .partial()
   .refine((v) => Object.keys(v).length > 0, "Nada para atualizar.");
 
 /** Corpo do PATCH: campos editáveis e/ou mudança de status. */
 export const patchTicketSchema = z
   .object({ ...updatableFields, status: statusEnum })
+  .strict()
   .partial()
   .refine((v) => Object.keys(v).length > 0, "Nada para atualizar.");
 
@@ -48,3 +49,14 @@ export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
 export type ListTicketsQuery = Partial<z.input<typeof listQuerySchema>> & { page: number; pageSize: number };
 export type PatchTicketInput = z.infer<typeof patchTicketSchema>;
 export type TicketStatus = z.infer<typeof statusEnum>;
+
+export const assignTicketSchema = z
+  .object({
+    teamId: z.string().min(1).nullable(),
+    assigneeId: z.string().min(1).nullable(),
+  })
+  .partial()
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, "Informe a equipe e/ou o responsável.");
+
+export type AssignTicketInput = z.infer<typeof assignTicketSchema>;

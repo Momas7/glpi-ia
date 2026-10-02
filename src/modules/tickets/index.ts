@@ -7,15 +7,18 @@ export {
   createTicket,
   getTicket,
   listTickets,
+  patchTicket,
   registerTicketCreatedHook,
   updateTicket,
   type TicketWithRefs,
 } from "./service";
 export {
+  assignTicketSchema,
   createTicketSchema,
   listQuerySchema,
   patchTicketSchema,
   updateTicketSchema,
+  type AssignTicketInput,
   type CreateTicketInput,
   type ListTicketsQuery,
   type PatchTicketInput,
@@ -30,3 +33,4 @@ export {
   listAttachments,
   saveAttachment,
 } from "./attachments";
+export { assignTicket, takeTicket } from "./assignment";
