@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: "standalone",
+  // O pg usa módulos nativos opcionais; manter fora do bundle do servidor.
+  serverExternalPackages: ["pg", "pg-boss", "pino"],
 };
 
 export default nextConfig;
