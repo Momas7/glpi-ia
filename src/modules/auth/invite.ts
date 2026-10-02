@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db";
 import { recordAudit } from "@/modules/audit";
+import { emitEvent } from "@/modules/integrations";
 import { hashPassword, validatePasswordPolicy } from "./password";
 import { hashToken, type Role } from "./session";
 import { appUrl, newToken } from "./tokens";
@@ -25,8 +26,15 @@ export async function createInvite(input: {
       where: { email, usedAt: null, revokedAt: null, expiresAt: { gt: now } },
       data: { revokedAt: now },
     });
+    const expiresAt = new Date(now.getTime() + INVITE_TTL_MS);
     const invite = await tx.invite.create({
-      data: { email, role: input.role, tokenHash, expiresAt: new Date(now.getTime() + INVITE_TTL_MS), createdById: input.createdById },
+      data: { email, role: input.role, tokenHash, expiresAt, createdById: input.createdById },
+    });
+    await emitEvent(tx, "auth.invite_created", {
+      email,
+      role: input.role,
+      url: `${appUrl()}/accept-invite?token=${token}`,
+      expiresAt: expiresAt.toISOString(),
     });
     await recordAudit(tx, {
       actorId: input.createdById,

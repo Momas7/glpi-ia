@@ -3,6 +3,7 @@ import { createDb, type Db } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/modules/auth/password";
 import { hashToken } from "@/modules/auth/session";
 import { startTestDb, type TestDb } from "./helpers/db";
+import { queuedEvents } from "./helpers/queued-events";
 
 const PASSWORD = "Tr0ca-Isto-Aqui!";
 const NEW_PASSWORD = "Outra-Senha-Forte-9";
@@ -11,8 +12,9 @@ let db: Db;
 let invite: typeof import("@/modules/auth/invite");
 let reset: typeof import("@/modules/auth/reset");
 let auth: typeof import("@/modules/auth");
-let notifications: typeof import("@/modules/notifications");
-let mails: { to: string; subject: string; text: string }[] = [];
+// Convite e reset agora saem como eventos para o n8n; o teste lê os corpos enfileirados.
+const resetEvents = async () =>
+  (await queuedEvents(db, "auth.password_reset_requested")).map((e) => e.data as { email: string; url: string });
 
 beforeAll(async () => {
   testDb = await startTestDb();
@@ -23,17 +25,18 @@ beforeAll(async () => {
   invite = await import("@/modules/auth/invite");
   reset = await import("@/modules/auth/reset");
   auth = await import("@/modules/auth");
-  notifications = await import("@/modules/notifications");
-  notifications.setMailTransport(async (m) => void mails.push(m));
+  process.env.N8N_WEBHOOK_URL = "http://n8n.invalid/webhook";
+  process.env.N8N_WEBHOOK_SECRET = "s".repeat(32);
 });
 
 afterAll(async () => {
+  await (await import("@/lib/queue")).stopQueue();
   await db?.$disconnect();
   await testDb?.stop();
 });
 
 beforeEach(async () => {
-  mails = [];
+  await db.$executeRaw`DELETE FROM pgboss.job WHERE name = 'webhook.deliver'`.catch(() => {});
   await db.passwordReset.deleteMany();
   await db.auditLog.deleteMany();
   await db.invite.deleteMany();
@@ -96,17 +99,18 @@ describe("reset de senha", () => {
     await mkUser("ana@x.com");
     await expect(reset.requestReset("ana@x.com")).resolves.toBeUndefined();
     await expect(reset.requestReset("fantasma@x.com")).resolves.toBeUndefined();
-    expect(mails).toHaveLength(1);
-    expect(mails[0].to).toBe("ana@x.com");
-    expect(mails[0].text).toMatch(/http:\/\/app\.test\/reset\?token=/);
+    const events = await resetEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0].email).toBe("ana@x.com");
+    expect(events[0].url).toMatch(/^http:\/\/app\.test\/reset\?token=/);
     const row = await db.passwordReset.findFirstOrThrow();
-    const token = /token=([^\s&]+)/.exec(mails[0].text)![1];
+    const token = new URL(events[0].url).searchParams.get("token")!;
     expect(row.tokenHash).toBe(hashToken(token));
   });
 
   async function startReset(email = "ana@x.com") {
     await reset.requestReset(email);
-    return /token=([^\s&]+)/.exec(mails.at(-1)!.text)![1];
+    return new URL((await resetEvents()).at(-1)!.url).searchParams.get("token")!;
   }
 
   it("senha fraca falha e não consome o token", async () => {
@@ -168,7 +172,23 @@ describe("forgot: limite por e-mail", () => {
     const statuses: number[] = [];
     for (let i = 1; i <= 5; i++) statuses.push((await hit(i)).status);
     expect(statuses).toEqual([200, 200, 200, 429, 429]);
-    expect(mails.length).toBe(3);
+    expect(await resetEvents()).toHaveLength(3);
+  });
+});
+
+describe("avisos de convite e reset (n8n)", () => {
+  it("createInvite enfileira auth.invite_created com o link que o aceite usa", async () => {
+    const adminUser = await mkUser("chefe@x.com", "ADMIN");
+    await auth.createInvite({ email: "Novo@X.com", role: "AGENT", createdById: adminUser.id });
+    const [ev] = await queuedEvents(db, "auth.invite_created");
+    expect(ev.data).toMatchObject({ email: "novo@x.com", role: "AGENT" });
+    const token = new URL(ev.data.url as string).searchParams.get("token")!;
+    expect(await invite.acceptInvite({ token, name: "Novo", password: PASSWORD })).toEqual({ ok: true });
+  });
+
+  it("e-mail inexistente não enfileira aviso", async () => {
+    await reset.requestReset("ninguem@x.com");
+    expect(await resetEvents()).toHaveLength(0);
   });
 });
 
