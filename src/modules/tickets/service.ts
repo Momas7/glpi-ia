@@ -2,7 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/lib/db";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { escapeLike } from "@/lib/like";
-import { emitCommentEvent, emitTicketEvent } from "@/modules/integrations";
+import { emitTicketEvent } from "@/modules/integrations";
 import { can, type SessionUser } from "@/modules/auth";
 import type { CreateTicketInput, ListTicketsQuery, TicketStatus, UpdateTicketInput } from "./schemas";
 

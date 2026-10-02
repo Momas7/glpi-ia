@@ -8,7 +8,7 @@ let testDb: TestDb;
 let db: Db;
 let keys: typeof import("@/modules/integrations");
 let session: typeof import("@/modules/auth/session");
-let admin: SessionUser, agent: SessionUser;
+let admin: SessionUser;
 const cookie: Record<string, string> = {};
 
 beforeAll(async () => {
@@ -37,7 +37,7 @@ beforeEach(async () => {
     return { id: u.id, name, email: u.email, role, teamIds: [] } as SessionUser;
   };
   admin = await mk("Admin", "ADMIN");
-  agent = await mk("Agente", "AGENT");
+  await mk("Agente", "AGENT");
 });
 
 async function route(mod: string, method: "GET" | "POST" | "DELETE", c: string, params: Record<string, string> = {}, body?: unknown) {

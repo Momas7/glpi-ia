@@ -1,7 +1,11 @@
 import { getDb } from "@/lib/db";
+import { AppError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { defineQueue, registerHandler } from "@/lib/queue";
-import { DELIVER_QUEUE, type DeliverJob } from "./events";
+import { defineQueue, enqueue, registerHandler, type PrismaTransaction } from "@/lib/queue";
+// Imports diretos (não pelo index de auth) evitam ciclo: auth usa emitEvent deste módulo.
+import { can } from "@/modules/auth/can";
+import type { SessionUser } from "@/modules/auth/session";
+import { DELIVER_QUEUE, ticketEventData, type DeliverJob } from "./events";
 import { signPayload } from "./signature";
 
 const FAILED_QUEUE = "webhook.failed";
@@ -62,4 +66,58 @@ export async function registerWebhookQueues(opts: { retryLimit?: number; retryDe
   });
   await registerHandler<DeliverJob>(DELIVER_QUEUE, deliverWebhook);
   await registerHandler<DeliverJob>(FAILED_QUEUE, markFailed);
+}
+
+function assertAdmin(actor: SessionUser) {
+  if (!can(actor, "admin:manage")) throw new ForbiddenError();
+}
+
+export async function listFailedDeliveries(actor: SessionUser, limit = 50) {
+  assertAdmin(actor);
+  const rows = await getDb().webhookDelivery.findMany({
+    where: { status: "FAILED" },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+  const ticketIds = rows.map((r) => r.ticketId).filter((id): id is string => !!id);
+  const tickets = await getDb().ticket.findMany({ where: { id: { in: ticketIds } }, select: { id: true, number: true } });
+  const numberOf = new Map(tickets.map((t) => [t.id, t.number]));
+  return rows.map((r) => ({
+    id: r.id,
+    eventId: r.eventId,
+    type: r.type,
+    ticketNumber: r.ticketId ? (numberOf.get(r.ticketId) ?? null) : null,
+    attempts: r.attempts,
+    lastError: r.lastError,
+    createdAt: r.createdAt,
+  }));
+}
+
+/**
+ * Reenvia um aviso que falhou. O corpo original não é guardado: é remontado com o estado ATUAL do chamado
+ * (mesmo id de evento, `redelivery: true`). Avisos de convite/reset não podem ser remontados (o token não é guardado).
+ */
+export async function retryDelivery(actor: SessionUser, deliveryId: string): Promise<void> {
+  assertAdmin(actor);
+  await getDb().$transaction(async (tx) => {
+    const d = await tx.webhookDelivery.findUnique({ where: { id: deliveryId } });
+    if (!d) throw new NotFoundError("Aviso não encontrado.");
+    if (d.type.startsWith("auth.")) throw new AppError(409, "Este aviso não pode ser reenviado. Gere um novo convite ou link.");
+    if (d.status !== "FAILED") throw new AppError(409, "Só avisos com falha podem ser reenviados.");
+    if (!d.ticketId) throw new AppError(409, "Aviso sem chamado associado.");
+
+    let data: Record<string, unknown>;
+    if (d.type === "comment.created") {
+      const comment = await tx.comment.findUniqueOrThrow({
+        where: { id: d.subjectId ?? "" },
+        include: { author: { select: { name: true, email: true } } },
+      });
+      data = { ticket: await ticketEventData(tx, d.ticketId), commentId: comment.id, author: comment.author, redelivery: true };
+    } else {
+      data = { ...(await ticketEventData(tx, d.ticketId)), redelivery: true };
+    }
+    const body = JSON.stringify({ id: d.eventId, type: d.type, occurredAt: new Date().toISOString(), data });
+    await tx.webhookDelivery.update({ where: { id: d.id }, data: { status: "PENDING" } });
+    await enqueue<DeliverJob>(DELIVER_QUEUE, { deliveryId: d.id, body }, { tx: tx as PrismaTransaction });
+  });
 }

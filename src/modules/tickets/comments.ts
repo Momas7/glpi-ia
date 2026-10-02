@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { can, type SessionUser } from "@/modules/auth";
-import { emitCommentEvent, emitTicketEvent } from "@/modules/integrations";
+import { emitCommentEvent } from "@/modules/integrations";
 import { ForbiddenError, TicketNotFoundError, getTicket } from "./service";
 
 export const commentSchema = z.object({

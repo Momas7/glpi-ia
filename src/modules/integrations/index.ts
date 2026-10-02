@@ -6,7 +6,7 @@ export {
   type EventType,
   type TicketEventData,
 } from "./events";
-export { deliverWebhook, registerWebhookQueues } from "./delivery";
+export { deliverWebhook, listFailedDeliveries, registerWebhookQueues, retryDelivery } from "./delivery";
 export { signPayload, verifySignature } from "./signature";
 export {
   API_SCOPES,
