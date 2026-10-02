@@ -1,6 +1,7 @@
 import { createDb, type Db } from "../src/lib/db";
 import { hashPassword } from "../src/modules/auth/password";
 import { nationalHolidays } from "../src/modules/sla/holidays";
+import { invalidateCalendarCache, slaOnCreate } from "../src/modules/sla/service";
 
 // Dados 100% fictícios. Nada aqui vem de uma empresa real.
 const TEAMS = ["Infraestrutura", "Suporte N1", "Sistemas"] as const;
@@ -95,11 +96,16 @@ async function seedDemo(db: Db, teamIds: Map<string, string>): Promise<void> {
     });
   }
 
-  for (const [title, description, categoryName, priority, type, status] of DEMO_TICKETS) {
+  invalidateCalendarCache();
+  const HOUR = 3600_000;
+  for (const [index, [title, description, categoryName, priority, type, status]] of DEMO_TICKETS.entries()) {
     if (await db.ticket.findFirst({ where: { title, requesterId: requester.id } })) continue;
     const category = await db.category.findFirst({ where: { name: categoryName, parentId: null } });
+    // Datas espalhadas no passado: os mais antigos ainda abertos aparecem vencidos na demonstração.
+    const createdAt = new Date(Date.now() - index * 7 * HOUR);
     const ticket = await db.ticket.create({
       data: {
+        createdAt,
         title,
         description,
         priority,
@@ -111,8 +117,10 @@ async function seedDemo(db: Db, teamIds: Map<string, string>): Promise<void> {
         assigneeId: status === "NEW" ? null : agent.id,
         resolvedAt: status === "RESOLVED" || status === "CLOSED" ? new Date() : null,
         closedAt: status === "CLOSED" ? new Date() : null,
+        pausedAt: status === "PENDING" ? new Date(createdAt.getTime() + HOUR) : null,
       },
     });
+    await db.$transaction((tx) => slaOnCreate(tx, ticket.id, createdAt));
     await db.ticketEvent.create({
       data: { ticketId: ticket.id, actorId: requester.id, type: "CREATED", data: { number: ticket.number } },
     });
