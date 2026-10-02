@@ -1,20 +1,13 @@
 import { CategoryDefaultTeam, CreateCategoryForm } from "@/components/admin/CategoryForm";
 import { CreateTeamForm, TeamMembers } from "@/components/admin/TeamMembers";
 import { requireUser } from "@/lib/server-session";
-import { listCategories, listTeams, listUsers } from "@/modules/admin";
+import { listActiveStaff, listCategories, listTeams } from "@/modules/admin";
 
 export const metadata = { title: "Equipes e categorias · Administração" };
 
 export default async function TeamsPage() {
   const user = await requireUser();
-  const [teams, categories, users] = await Promise.all([
-    listTeams(user),
-    listCategories(user),
-    listUsers(user, { page: 1, pageSize: 100 }),
-  ]);
-  const staff = users.items
-    .filter((u) => u.active && u.role !== "REQUESTER")
-    .map((u) => ({ id: u.id, name: u.name, email: u.email }));
+  const [teams, categories, staff] = await Promise.all([listTeams(user), listCategories(user), listActiveStaff(user)]);
   const teamOptions = teams.map((t) => ({ id: t.id, name: t.name }));
 
   return (

@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { AppError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { recordAudit } from "@/modules/audit";
 import { can, type SessionUser } from "@/modules/auth";
+import { releaseAssignments } from "@/modules/tickets";
 
 const STAFF_ROLES = ["AGENT", "TEAM_LEAD", "ADMIN"] as const;
 
@@ -88,6 +89,7 @@ export async function removeMember(actor: SessionUser, teamId: string, userId: s
     await requireTeam(tx, teamId);
     const removed = await tx.teamMember.deleteMany({ where: { userId, teamId } });
     if (removed.count === 0) return;
+    await releaseAssignments(tx, { actorId: actor.id, userId, teamId });
     await recordAudit(tx, { actorId: actor.id, action: "team.member_remove", targetType: "team", targetId: teamId, data: { userId } });
   });
 }

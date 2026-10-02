@@ -32,6 +32,8 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.auditLog.deleteMany();
+  await db.ticketEvent.deleteMany();
+  await db.ticket.deleteMany();
   await db.invite.deleteMany();
   await db.session.deleteMany();
   await db.teamMember.deleteMany();
@@ -177,5 +179,52 @@ describe("convites", () => {
     expect((await list.json()).invites).toHaveLength(1);
     expect((await route(INVITE, "DELETE", { cookie: cookieOf["ana@x.com"], params: { id: inv.id } })).status).toBe(200);
     expect((await admin.listPendingInvites(adminA))).toHaveLength(0);
+  });
+});
+
+describe("revisão: alcance da lista e efeitos de desativar/rebaixar", () => {
+  it("listActiveStaff traz todos os técnicos ativos, mesmo com mais de 100 usuários", async () => {
+    await db.user.createMany({
+      data: Array.from({ length: 150 }, (_, i) => ({ name: `Aaa ${String(i).padStart(3, "0")}`, email: `aaa${i}@x.com`, role: "REQUESTER" as const })),
+    });
+    await db.user.create({ data: { name: "Zé Técnico", email: "ze@x.com", role: "AGENT" } });
+    const staff = await admin.listActiveStaff(adminA);
+    expect(staff.map((s) => s.email)).toContain("ze@x.com");
+    expect(staff.every((s) => s.email !== "duda@x.com")).toBe(true);
+    const page2 = await admin.listUsers(adminA, { page: 2, pageSize: 100 });
+    expect(page2.items.length).toBeGreaterThan(0);
+  });
+
+  async function openTicketAssignedTo(userId: string, teamId: string | null, status: "OPEN" | "RESOLVED" = "OPEN") {
+    return db.ticket.create({ data: { title: "t", description: "d", requesterId: requester.id, assigneeId: userId, teamId, status } });
+  }
+
+  it("desativar tira o usuário de responsável dos chamados abertos (resolvidos ficam) e registra ASSIGNED", async () => {
+    const teamId = agent.teamIds[0];
+    const open = await openTicketAssignedTo(agent.id, teamId);
+    const resolved = await openTicketAssignedTo(agent.id, teamId, "RESOLVED");
+    await admin.setActive(adminA, agent.id, false);
+    expect((await db.ticket.findUniqueOrThrow({ where: { id: open.id } })).assigneeId).toBeNull();
+    expect((await db.ticket.findUniqueOrThrow({ where: { id: resolved.id } })).assigneeId).toBe(agent.id);
+    const ev = await db.ticketEvent.findFirstOrThrow({ where: { ticketId: open.id, type: "ASSIGNED" } });
+    expect(ev.actorId).toBe(adminA.id);
+  });
+
+  it("rebaixar a solicitante tira de responsável e remove das equipes", async () => {
+    const open = await openTicketAssignedTo(agent.id, agent.teamIds[0]);
+    await admin.changeRole(adminA, agent.id, "REQUESTER");
+    expect((await db.ticket.findUniqueOrThrow({ where: { id: open.id } })).assigneeId).toBeNull();
+    expect(await db.teamMember.count({ where: { userId: agent.id } })).toBe(0);
+  });
+
+  it("desativar ou rebaixar um admin revoga os convites pendentes que ele criou", async () => {
+    const byB = await auth.createInvite({ email: "porb@x.com", role: "ADMIN", createdById: adminB.id });
+    await admin.setActive(adminA, adminB.id, false);
+    expect(await auth.acceptInvite({ token: byB.token, name: "X", password: PASSWORD })).toEqual({ ok: false });
+
+    await admin.setActive(adminA, adminB.id, true);
+    const again = await auth.createInvite({ email: "porb2@x.com", role: "AGENT", createdById: adminB.id });
+    await admin.changeRole(adminA, adminB.id, "AGENT");
+    expect(await auth.acceptInvite({ token: again.token, name: "Y", password: PASSWORD })).toEqual({ ok: false });
   });
 });

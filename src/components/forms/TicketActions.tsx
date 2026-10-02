@@ -56,7 +56,9 @@ export function TicketActions({
               }}
               className={selectClass}
             >
-              <option value="">Sem equipe</option>
+              <option value="" disabled>
+                Escolha a equipe
+              </option>
               {teams.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -79,7 +81,10 @@ export function TicketActions({
             size="sm"
             disabled={pending}
             onClick={() =>
-              run(`/api/tickets/${ticketId}/assign`, "POST", { teamId: teamId || null, assigneeId: assigneeId || null })
+              run(`/api/tickets/${ticketId}/assign`, "POST", {
+                ...(teamId ? { teamId } : {}),
+                assigneeId: assigneeId || null,
+              })
             }
           >
             Salvar atribuição
