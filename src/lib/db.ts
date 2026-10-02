@@ -1,5 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
+import { requireDatabaseUrl } from "@/lib/config";
 
 export type Db = PrismaClient;
 
@@ -11,6 +12,6 @@ const globalForDb = globalThis as unknown as { db?: Db };
 
 /** Singleton para web e worker; reaproveitado no hot reload do Next em dev. */
 export function getDb(): Db {
-  globalForDb.db ??= createDb(process.env.DATABASE_URL ?? "");
+  globalForDb.db ??= createDb(requireDatabaseUrl(process.env));
   return globalForDb.db;
 }

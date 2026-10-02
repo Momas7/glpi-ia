@@ -23,10 +23,14 @@ COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/prisma.config.ts ./
+RUN mkdir -p /data/uploads && chown node:node /data/uploads
+USER node
 EXPOSE 3000
 CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node server.js"]
 
 # ---- worker: mesmo código, outro entrypoint
 FROM build AS worker
 ENV NODE_ENV=production SERVICE_NAME=worker
+RUN mkdir -p /data/uploads && chown node:node /data/uploads
+USER node
 CMD ["npm", "run", "worker"]
