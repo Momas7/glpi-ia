@@ -1,6 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/lib/db";
-import { AppError } from "@/lib/errors";
+import { AppError, ForbiddenError } from "@/lib/errors";
 import { can, type SessionUser } from "@/modules/auth";
 import type { CreateTicketInput, ListTicketsQuery, TicketStatus, UpdateTicketInput } from "./schemas";
 
@@ -13,11 +13,7 @@ export class TicketNotFoundError extends AppError {
     super(404, "Chamado não encontrado.");
   }
 }
-export class ForbiddenError extends AppError {
-  constructor(message = "Sem permissão para esta ação.") {
-    super(403, message);
-  }
-}
+export { ForbiddenError };
 export class InvalidTransitionError extends AppError {
   constructor(from: string, to: string) {
     super(409, `Transição de status inválida: ${from} → ${to}.`);

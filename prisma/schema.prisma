@@ -81,6 +81,7 @@ model User {
   comments       Comment[]
   attachments    Attachment[]
   events         TicketEvent[]
+  auditLogs      AuditLog[]
 }
 
 model Session {
@@ -101,9 +102,12 @@ model Invite {
   tokenHash   String    @unique
   expiresAt   DateTime
   usedAt      DateTime?
+  revokedAt   DateTime?
   createdById String
   createdBy   User      @relation(fields: [createdById], references: [id])
   createdAt   DateTime  @default(now())
+
+  @@index([email])
 }
 
 model PasswordReset {
@@ -188,11 +192,25 @@ model TicketEvent {
   id        String   @id @default(cuid())
   ticketId  String
   ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  actorId   String
-  actor     User     @relation(fields: [actorId], references: [id])
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
   type      String
   data      Json
   createdAt DateTime @default(now())
 
   @@index([ticketId, createdAt])
+}
+
+/** Ações administrativas (convites, papéis, equipes, categorias, SLA, chaves de API). */
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actor      User     @relation(fields: [actorId], references: [id])
+  action     String
+  targetType String
+  targetId   String
+  data       Json
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId, createdAt])
 }
