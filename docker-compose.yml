@@ -15,5 +15,42 @@ services:
       timeout: 3s
       retries: 10
 
+  web:
+    build:
+      context: .
+      target: web
+    environment: &app-env
+      DATABASE_URL: postgresql://glpi:glpi@postgres:5432/glpi_ia
+      SESSION_SECRET: ${SESSION_SECRET:?defina SESSION_SECRET no .env}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - uploads:/data/uploads
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  worker:
+    build:
+      context: .
+      target: worker
+    environment: *app-env
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      web:
+        condition: service_healthy
+
 volumes:
   pgdata:
+  uploads:
