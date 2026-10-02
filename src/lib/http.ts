@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { readBodyLimited } from "@/lib/body";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { getRequestUser, type SessionUser } from "@/modules/auth";
 
 z.config(z.locales.ptBR());
 
-/** IP do cliente. Atrás do proxy (Caddy) o primeiro item de X-Forwarded-For é o cliente real. */
-export function clientIp(req: Request): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-}
+export { clientIp } from "@/lib/client-ip";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -59,8 +57,25 @@ export function withAuth<P = Record<string, never>>(handler: (ctx: AuthedContext
   };
 }
 
+const MAX_JSON_BYTES = 64 * 1024;
+
+/** Lê JSON com teto de 64 KB (413 acima disso); JSON malformado vira 400. */
 export async function readJson(req: Request): Promise<unknown> {
-  return req.json().catch(() => {
+  const bytes = await readBodyLimited(req, MAX_JSON_BYTES);
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
     throw new AppError(400, "Corpo da requisição inválido.");
-  });
+  }
+}
+
+/** Para rotas públicas (sem sessão): converte erros de domínio e de validação em respostas HTTP. */
+export function withErrors(handler: (req: Request) => Promise<Response>) {
+  return async (req: Request): Promise<Response> => {
+    try {
+      return await handler(req);
+    } catch (err) {
+      return errorResponse(err);
+    }
+  };
 }

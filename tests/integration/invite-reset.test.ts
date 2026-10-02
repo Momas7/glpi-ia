@@ -152,6 +152,25 @@ describe("reset de senha", () => {
   });
 });
 
+describe("forgot: limite por e-mail", () => {
+  it("o mesmo e-mail não recebe mais de 3 resets por janela, mesmo trocando de IP", async () => {
+    await mkUser("alvo@x.com");
+    const { POST } = await import("@/app/api/auth/forgot/route");
+    const hit = (i: number) =>
+      POST(
+        new Request("http://app.test/api/auth/forgot", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-forwarded-for": `8.8.8.${i}` },
+          body: JSON.stringify({ email: "alvo@x.com" }),
+        }),
+      );
+    const statuses: number[] = [];
+    for (let i = 1; i <= 5; i++) statuses.push((await hit(i)).status);
+    expect(statuses).toEqual([200, 200, 200, 429, 429]);
+    expect(mails.length).toBe(3);
+  });
+});
+
 describe("rotas", () => {
   const call = async (path: string, body: unknown, cookie?: string) => {
     const mod = await import(`@/app/api/auth/${path}/route`);

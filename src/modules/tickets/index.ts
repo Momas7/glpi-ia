@@ -25,6 +25,7 @@ export {
 export { addComment, getComments, commentSchema } from "./comments";
 export {
   MAX_ATTACHMENT_BYTES,
+  assertCanAttach,
   getAttachmentFile,
   listAttachments,
   saveAttachment,

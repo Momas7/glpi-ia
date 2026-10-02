@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { clientIp } from "@/lib/http";
+import { clientIp, readJson, withErrors } from "@/lib/http";
 import { checkRateLimit, resetPassword } from "@/modules/auth";
 
 const bodySchema = z.object({
@@ -8,8 +8,8 @@ const bodySchema = z.object({
   password: z.string().min(1).max(256),
 });
 
-export async function POST(req: Request) {
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
+export const POST = withErrors(async (req: Request) => {
+  const parsed = bodySchema.safeParse(await readJson(req));
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos." }, { status: 400 });
   if (!checkRateLimit(`reset:ip:${clientIp(req)}`, 10, 15 * 60)) {
     return NextResponse.json({ error: "Muitas tentativas. Tente novamente em instantes." }, { status: 429 });
@@ -22,4 +22,4 @@ export async function POST(req: Request) {
     );
   }
   return NextResponse.json({ ok: true });
-}
+});

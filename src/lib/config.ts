@@ -18,6 +18,8 @@ const schema = z.object({
   SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM: z.string().optional(),
   UPLOAD_DIR: z.string().default("./uploads"),
+  TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).default(1),
+  DEFAULT_INTAKE_TEAM: z.string().min(1).default("Suporte N1"),
 });
 
 export type Config = z.output<typeof schema>;

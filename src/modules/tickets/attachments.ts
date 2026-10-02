@@ -58,6 +58,13 @@ function displayName(original: string): string {
   return base.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 200) || "arquivo";
 }
 
+/** Confere visibilidade e permissão ANTES de ler o corpo da requisição. */
+export async function assertCanAttach(actor: SessionUser, ticketId: string): Promise<void> {
+  const ticket = await getTicket(actor, ticketId);
+  if (!ticket) throw new TicketNotFoundError();
+  if (!can(actor, "attachment:add", ticket)) throw new ForbiddenError();
+}
+
 export async function saveAttachment(
   actor: SessionUser,
   ticketId: string,

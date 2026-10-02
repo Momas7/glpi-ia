@@ -81,6 +81,11 @@ export async function createTicket(actor: SessionUser, input: CreateTicketInput)
       const category = await tx.category.findUnique({ where: { id: input.categoryId } });
       teamId = category?.defaultTeamId ?? null;
     }
+    // Sem equipe definida, o chamado cai na equipe de entrada para não ficar invisível aos técnicos.
+    if (!teamId) {
+      const intake = await tx.team.findUnique({ where: { name: process.env.DEFAULT_INTAKE_TEAM ?? "Suporte N1" } });
+      teamId = intake?.id ?? null;
+    }
     const ticket = await tx.ticket.create({
       data: {
         title: input.title,
@@ -135,15 +140,19 @@ export async function changeStatus(actor: SessionUser, id: string, to: TicketSta
 
   const now = new Date();
   return getDb().$transaction(async (tx) => {
-    const updated = await tx.ticket.update({
-      where: { id },
+    // Atualização condicional ao status lido: se outra pessoa mudou o chamado entretanto, count = 0.
+    const claimed = await tx.ticket.updateMany({
+      where: { id, status: current.status },
       data: {
         status: to,
         resolvedAt: to === "RESOLVED" ? now : to === "OPEN" ? null : undefined,
         closedAt: to === "CLOSED" ? now : undefined,
       },
-      include,
     });
+    if (claimed.count !== 1) {
+      throw new AppError(409, "O chamado foi alterado por outra pessoa. Atualize a página e tente de novo.");
+    }
+    const updated = await tx.ticket.findUniqueOrThrow({ where: { id }, include });
     await tx.ticketEvent.create({
       data: { ticketId: id, actorId: actor.id, type: "STATUS_CHANGED", data: { from: current.status, to } },
     });
