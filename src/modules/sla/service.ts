@@ -1,7 +1,9 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { emitTicketEvent } from "@/modules/integrations";
 import { addBusinessMinutes, businessMinutesBetween, type BusinessCalendar } from "./calendar";
+import { slaState } from "./state";
 
 type Tx = Prisma.TransactionClient;
 type Status = "NEW" | "OPEN" | "PENDING" | "RESOLVED" | "CLOSED";
@@ -130,4 +132,41 @@ export async function slaOnComment(
       firstResponseBusinessMinutes: Math.max(0, businessMinutesBetween(t.createdAt, now, cal) - t.pausedMinutes - ongoingPause),
     },
   });
+}
+
+/**
+ * Varredura do job `sla.scan`: publica `sla.warning` (em risco) e `sla.breached` (vencido) uma vez por chamado.
+ * A marcação é condicional (`updateMany ... IS NULL`), então duas varreduras simultâneas não duplicam o aviso.
+ */
+export async function scanSla(now: Date = new Date()): Promise<{ warned: number; breached: number }> {
+  const db = getDb();
+  const cal = await loadCalendar();
+  const open = await db.ticket.findMany({
+    where: { status: { notIn: ["RESOLVED", "CLOSED"] }, pausedAt: null, resolutionDue: { not: null }, slaBreachedAt: null },
+    select: { id: true, status: true, createdAt: true, resolutionDue: true, slaResolutionMinutes: true, pausedAt: true, pausedMinutes: true, slaWarnedAt: true },
+  });
+  let warned = 0;
+  let breached = 0;
+  for (const t of open) {
+    const { state, remainingMinutes } = slaState(t, now, cal);
+    if (state === "breached") {
+      const sent = await db.$transaction(async (tx) => {
+        const claimed = await tx.ticket.updateMany({ where: { id: t.id, slaBreachedAt: null }, data: { slaBreachedAt: now } });
+        if (claimed.count !== 1) return false;
+        await emitTicketEvent(tx, "sla.breached", t.id, { resolutionDue: t.resolutionDue });
+        return true;
+      });
+      if (sent) breached++;
+    } else if (state === "at_risk" && !t.slaWarnedAt) {
+      const sent = await db.$transaction(async (tx) => {
+        const claimed = await tx.ticket.updateMany({ where: { id: t.id, slaWarnedAt: null }, data: { slaWarnedAt: now } });
+        if (claimed.count !== 1) return false;
+        await emitTicketEvent(tx, "sla.warning", t.id, { resolutionDue: t.resolutionDue, remainingMinutes });
+        return true;
+      });
+      if (sent) warned++;
+    }
+  }
+  if (warned || breached) logger.info({ warned, breached }, "alertas de SLA publicados");
+  return { warned, breached };
 }

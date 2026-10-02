@@ -3,6 +3,7 @@ export { easterSunday, nationalHolidays } from "./holidays";
 export {
   invalidateCalendarCache,
   loadCalendar,
+  scanSla,
   slaOnComment,
   slaOnCreate,
   slaOnPriorityChange,
