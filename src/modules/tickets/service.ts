@@ -2,6 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/lib/db";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { escapeLike } from "@/lib/like";
+import { emitCommentEvent, emitTicketEvent } from "@/modules/integrations";
 import { can, type SessionUser } from "@/modules/auth";
 import type { CreateTicketInput, ListTicketsQuery, TicketStatus, UpdateTicketInput } from "./schemas";
 
@@ -98,6 +99,7 @@ export async function createTicket(actor: SessionUser, input: CreateTicketInput)
     await tx.ticketEvent.create({
       data: { ticketId: ticket.id, actorId: actor.id, type: "CREATED", data: { number: ticket.number } },
     });
+    await emitTicketEvent(tx, "ticket.created", ticket.id);
     for (const hook of createdHooks) await hook(tx, ticket);
     return ticket;
   });
@@ -153,6 +155,7 @@ async function applyStatus(tx: Tx, actor: SessionUser, current: TicketWithRefs, 
   await tx.ticketEvent.create({
     data: { ticketId: current.id, actorId: actor.id, type: "STATUS_CHANGED", data: { from: current.status, to } },
   });
+  await emitTicketEvent(tx, "ticket.status_changed", current.id, { from: current.status, to });
 }
 
 export async function updateTicket(actor: SessionUser, id: string, patch: UpdateTicketInput): Promise<TicketWithRefs> {

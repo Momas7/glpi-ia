@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { can, type SessionUser } from "@/modules/auth";
+import { emitCommentEvent, emitTicketEvent } from "@/modules/integrations";
 import { ForbiddenError, TicketNotFoundError, getTicket } from "./service";
 
 export const commentSchema = z.object({
@@ -24,6 +25,8 @@ export async function addComment(actor: SessionUser, ticketId: string, input: z.
     await tx.ticketEvent.create({
       data: { ticketId, actorId: actor.id, type: "COMMENTED", data: { internal: input.internal } },
     });
+    // Nota interna nunca sai do sistema.
+    if (!input.internal) await emitCommentEvent(tx, ticketId, comment.id, { name: actor.name, email: actor.email });
     return comment;
   });
 }
