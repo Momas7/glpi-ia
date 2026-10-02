@@ -13,9 +13,18 @@ export {
 export {
   createTicketSchema,
   listQuerySchema,
+  patchTicketSchema,
   updateTicketSchema,
   type CreateTicketInput,
   type ListTicketsQuery,
+  type PatchTicketInput,
   type TicketStatus,
   type UpdateTicketInput,
 } from "./schemas";
+export { addComment, getComments, commentSchema } from "./comments";
+export {
+  MAX_ATTACHMENT_BYTES,
+  getAttachmentFile,
+  listAttachments,
+  saveAttachment,
+} from "./attachments";
