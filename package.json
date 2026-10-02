@@ -56,7 +56,7 @@
     "tailwindcss": "^4",
     "testcontainers": "^12.2.0",
     "tsx": "^4.23.15",
-    "typescript": "^5",
+    "typescript": "^7",
     "vitest": "^5.0.3"
   },
   "overrides": {
