@@ -31,7 +31,7 @@ export function AttachmentForm({ ticketId }: { ticketId: string }) {
       <Button type="submit" size="sm" variant="secondary" disabled={pending}>
         {pending ? "Enviando…" : "Anexar"}
       </Button>
-      <span className="text-xs text-muted-foreground">png, jpg, pdf, txt, log, docx, xlsx · até 10 MB</span>
+      <span className="text-xs text-muted-foreground">png, jpg, jpeg, pdf, txt, log, docx, xlsx · até 10 MB</span>
       {error && (
         <p role="alert" className="w-full text-sm text-red-400">
           {error}

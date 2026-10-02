@@ -35,6 +35,7 @@ afterAll(async () => {
 beforeEach(async () => {
   mails = [];
   await db.passwordReset.deleteMany();
+  await db.auditLog.deleteMany();
   await db.invite.deleteMany();
   await db.session.deleteMany();
   await db.user.deleteMany();

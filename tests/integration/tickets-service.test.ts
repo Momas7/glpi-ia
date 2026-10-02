@@ -178,8 +178,9 @@ describe("visibilidade e permissões", () => {
 
   it("atribuir: agente é negado, líder da equipe consegue", async () => {
     const t = await createInT1("x");
-    await expect(svc.updateTicket(agent1, t.id, { assigneeId: agent1.id })).rejects.toThrow();
-    const up = await svc.updateTicket(lead1, t.id, { assigneeId: agent1.id });
+    await db.teamMember.create({ data: { userId: agent1.id, teamId: t1 } }).catch(() => {});
+    await expect(svc.assignTicket(agent1, t.id, { assigneeId: agent1.id })).rejects.toThrow();
+    const up = await svc.assignTicket(lead1, t.id, { assigneeId: agent1.id });
     expect(up.assigneeId).toBe(agent1.id);
   });
 });
@@ -214,5 +215,25 @@ describe("listagem", () => {
     expect(await titles("'")).toEqual(["Erro do O'Brien"]);
     expect(await titles("' OR 1=1 --")).toEqual([]);
     expect(await titles("impressora")).toEqual(["Impressora 100% quebrada"]);
+  });
+});
+
+describe("filtros rápidos (scope)", () => {
+  it("assigned, team e mine respeitam o ator e a visibilidade", async () => {
+    const a = await createInT1("atribuido");
+    await db.ticket.update({ where: { id: a.id }, data: { assigneeId: agent1.id } });
+    await createInT1("sem responsavel");
+    await create(agent1, "aberto pelo agente", { teamId: t2 });
+    const d = await create(reqB, "de outra pessoa");
+    await db.ticket.update({ where: { id: d.id }, data: { teamId: t2 } });
+
+    const titles = async (actor: typeof agent1, scope: "assigned" | "team" | "mine") =>
+      (await svc.listTickets(actor, { page: 1, pageSize: 50, scope })).items.map((i) => i.title).sort();
+
+    expect(await titles(agent1, "assigned")).toEqual(["atribuido"]);
+    expect(await titles(agent1, "team")).toEqual(["atribuido", "sem responsavel"]);
+    expect(await titles(agent1, "mine")).toEqual(["aberto pelo agente"]);
+    expect(await titles(reqA, "team")).toEqual([]);
+    expect(await titles(reqA, "mine")).toEqual(["atribuido", "sem responsavel"]);
   });
 });

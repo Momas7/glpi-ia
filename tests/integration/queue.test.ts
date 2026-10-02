@@ -74,3 +74,12 @@ describe("recuperação de falha no start", () => {
     await vi.waitFor(() => expect(handler).toHaveBeenCalledWith({ ok: true }), { timeout: 8000 });
   });
 });
+
+describe("agendamento", () => {
+  it("scheduleJob registra o cron no pg-boss", async () => {
+    const { scheduleJob, getQueue } = await import("@/lib/queue");
+    await scheduleJob("teste.agendado", "0 * * * *");
+    const schedules = await (await getQueue()).getSchedules("teste.agendado");
+    expect(schedules.map((s) => s.cron)).toContain("0 * * * *");
+  });
+});

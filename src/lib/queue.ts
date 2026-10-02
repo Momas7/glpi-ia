@@ -71,6 +71,13 @@ export async function registerHandler<T extends object>(
   });
 }
 
+/** Agenda um job recorrente (cron) no pg-boss, no fuso da aplicação. Idempotente. */
+export async function scheduleJob(name: string, cron: string): Promise<void> {
+  const instance = await getQueue();
+  await ensureQueue(instance, name);
+  await instance.schedule(name, cron, null, { tz: process.env.APP_TIMEZONE ?? "America/Sao_Paulo" });
+}
+
 export async function stopQueue(): Promise<void> {
   if (!boss) return;
   await boss.stop({ graceful: true, timeout: 5000 });

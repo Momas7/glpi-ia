@@ -107,3 +107,36 @@ describe("can: sem recurso", () => {
     expect(can(user("AGENT"), "ticket:create")).toBe(true);
   });
 });
+
+describe("can: ações da gestão (Fase 2.1)", () => {
+  const agent = user("AGENT"); // u1, equipe t1
+  const lead = user("TEAM_LEAD");
+  const admin = user("ADMIN", "a1", []);
+  const requester = user("REQUESTER", "r1", []);
+  const unassignedT1 = { requesterId: "r1", teamId: "t1", assigneeId: null };
+
+  it("ticket:take: técnico ou líder da equipe, só sem responsável", () => {
+    expect(can(agent, "ticket:take", unassignedT1)).toBe(true);
+    expect(can(lead, "ticket:take", unassignedT1)).toBe(true);
+    expect(can(agent, "ticket:take", { ...unassignedT1, assigneeId: "outro" })).toBe(false);
+    expect(can(agent, "ticket:take", { ...unassignedT1, teamId: "t2" })).toBe(false);
+    expect(can(requester, "ticket:take", unassignedT1)).toBe(false);
+    expect(can(admin, "ticket:take", unassignedT1)).toBe(true);
+  });
+
+  it("ticket:reopen e ticket:confirm: só o solicitante, só em RESOLVED", () => {
+    for (const a of ["ticket:reopen", "ticket:confirm"] as Action[]) {
+      expect(can(requester, a, { ...unassignedT1, status: "RESOLVED" }), a).toBe(true);
+      expect(can(requester, a, { ...unassignedT1, status: "CLOSED" }), a).toBe(false);
+      expect(can(requester, a, { ...unassignedT1, status: "OPEN" }), a).toBe(false);
+      expect(can(agent, a, { ...unassignedT1, status: "RESOLVED" }), `${a} técnico da equipe`).toBe(false);
+      expect(can(admin, a, { ...unassignedT1, status: "RESOLVED" }), `${a} admin`).toBe(false);
+      expect(can(user("REQUESTER", "outro", []), a, { ...unassignedT1, status: "RESOLVED" }), `${a} outro`).toBe(false);
+    }
+  });
+
+  it("admin:manage: só ADMIN", () => {
+    expect(can(admin, "admin:manage")).toBe(true);
+    for (const u of [agent, lead, requester]) expect(can(u, "admin:manage")).toBe(false);
+  });
+});

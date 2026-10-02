@@ -1,5 +1,7 @@
 import type { SessionUser } from "./session";
 
+export type TicketStatus = "NEW" | "OPEN" | "PENDING" | "RESOLVED" | "CLOSED";
+
 export type Action =
   | "ticket:create"
   | "ticket:read"
@@ -10,16 +12,25 @@ export type Action =
   | "comment:read_internal"
   | "attachment:add"
   | "user:invite"
-  | "user:manage";
+  | "user:manage"
+  | "ticket:take"
+  | "ticket:reopen"
+  | "ticket:confirm"
+  | "admin:manage";
 
 export interface TicketResource {
   requesterId?: string;
   teamId?: string | null;
   assigneeId?: string | null;
+  status?: TicketStatus;
 }
 
 /** Ponto único de autorização. Função pura: não consulta o banco. */
 export function can(user: SessionUser, action: Action, resource?: TicketResource): boolean {
+  // Ações que pertencem ao solicitante do chamado: nem o ADMIN as executa em nome dele.
+  if (action === "ticket:reopen" || action === "ticket:confirm") {
+    return !!resource && resource.requesterId === user.id && resource.status === "RESOLVED";
+  }
   if (user.role === "ADMIN") return true;
 
   switch (action) {
@@ -27,7 +38,10 @@ export function can(user: SessionUser, action: Action, resource?: TicketResource
       return true;
     case "user:invite":
     case "user:manage":
+    case "admin:manage":
       return false;
+    case "ticket:take":
+      return isStaff(user) && inMyTeam(user, resource) && !resource?.assigneeId;
     case "ticket:read":
     case "comment:create":
     case "attachment:add":

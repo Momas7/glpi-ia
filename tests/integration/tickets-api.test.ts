@@ -242,6 +242,14 @@ describe("anexos", () => {
     expect(row.storedName).toMatch(/^[0-9a-f-]{36}\.png$/);
   });
 
+  it("aceita .jpeg com conteúdo JPEG", async () => {
+    const t = await newTicket();
+    const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(32)]);
+    const res = await upload(cookies.reqA, t.id, "foto.jpeg", JPEG, "image/jpeg");
+    expect(res.status).toBe(201);
+    expect((await res.json()).attachment.mimeType).toBe("image/jpeg");
+  });
+
   it("rejeita .pdf cujo conteúdo não é PDF (ex.: executável) → 400", async () => {
     const t = await newTicket();
     const res = await upload(cookies.reqA, t.id, "evil.pdf", Buffer.from("MZ\x90\x00 executavel"), "application/pdf");

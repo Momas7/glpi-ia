@@ -21,18 +21,29 @@ export default async function TicketsPage({ searchParams }: { searchParams: SP }
     pageSize: first(raw.pageSize),
     status: first(raw.status) || undefined,
     q: first(raw.q) || undefined,
+    scope: first(raw.scope) || undefined,
   });
   const query = parsed.success ? parsed.data : listQuerySchema.parse({});
   const { items, total, page, pageSize } = await listTickets(user, query);
   const pages = Math.max(1, Math.ceil(total / pageSize));
 
-  const href = (p: number) => {
+  const href = (p: number, scope: string | undefined = query.scope) => {
     const sp = new URLSearchParams();
     if (query.q) sp.set("q", query.q);
     if (query.status) sp.set("status", query.status);
+    if (scope) sp.set("scope", scope);
     sp.set("page", String(p));
     return `/tickets?${sp}`;
   };
+  const chips: { label: string; scope?: "assigned" | "team" | "mine" }[] =
+    user.role === "REQUESTER"
+      ? [{ label: "Todos" }, { label: "Abertos por mim", scope: "mine" }]
+      : [
+          { label: "Todos" },
+          { label: "Atribuídos a mim", scope: "assigned" },
+          { label: "Minha equipe", scope: "team" },
+          { label: "Abertos por mim", scope: "mine" },
+        ];
 
   return (
     <div className="flex flex-col gap-5">
@@ -43,7 +54,21 @@ export default async function TicketsPage({ searchParams }: { searchParams: SP }
         </Link>
       </div>
 
+      <nav aria-label="Filtros rápidos" className="flex flex-wrap gap-2">
+        {chips.map((c) => (
+          <Link
+            key={c.label}
+            href={href(1, c.scope)}
+            aria-current={query.scope === c.scope ? "page" : undefined}
+            className={buttonVariants({ size: "sm", variant: query.scope === c.scope ? "secondary" : "outline" })}
+          >
+            {c.label}
+          </Link>
+        ))}
+      </nav>
+
       <form method="get" className="flex flex-wrap gap-2">
+        {query.scope && <input type="hidden" name="scope" value={query.scope} />}
         <Input name="q" defaultValue={query.q} placeholder="Buscar no título…" className="max-w-xs" />
         <select
           name="status"
