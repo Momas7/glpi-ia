@@ -13,6 +13,8 @@ Registro do que ficou adiado nas revisões independentes e das decisões que mud
 - Job `e2e` e `gitleaks-action` do CI não foram validados no GitHub (o repositório ainda não tem remoto).
 - `LICENSE`: o titular está como "Autores do projeto Chamados IA"; trocar pelo nome real.
 
+- Build do Next avisa "Dynamic filesystem access causes tracing of the whole project" em `src/modules/tickets/attachments.ts` (`readFile(path.join(uploadDir(), ...))`): a saída standalone passa a incluir o projeto inteiro. Escopar o caminho ou marcar o acesso para o Turbopack ignorar.
+
 ## Minor adiados (Fase 0)
 
 - Health check: timer de timeout não é limpo; teste não cobre timeout e deixa env/`globalThis.db` sujos.
