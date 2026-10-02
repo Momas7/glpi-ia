@@ -8,3 +8,11 @@ export {
 } from "./events";
 export { deliverWebhook, registerWebhookQueues } from "./delivery";
 export { signPayload, verifySignature } from "./signature";
+export {
+  API_SCOPES,
+  authenticateApiKey,
+  createApiKey,
+  listApiKeys,
+  revokeApiKey,
+  type ApiScope,
+} from "./api-keys";

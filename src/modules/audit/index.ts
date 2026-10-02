@@ -11,12 +11,14 @@ export type AuditAction =
   | "team.member_add"
   | "team.member_remove"
   | "category.create"
-  | "category.update";
+  | "category.update"
+  | "apikey.create"
+  | "apikey.revoke";
 
 export interface AuditEntry {
   actorId: string;
   action: AuditAction;
-  targetType: "user" | "invite" | "team" | "category";
+  targetType: "user" | "invite" | "team" | "category" | "apikey";
   targetId: string;
   data?: Record<string, unknown>;
 }
