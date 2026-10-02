@@ -1,0 +1,46 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+const read = (p: string) => readFileSync(p, "utf8");
+
+describe("configuração de deploy", () => {
+  const compose = read("docker-compose.yml");
+
+  it("não publica o Postgres em todas as interfaces", () => {
+    expect(compose).not.toMatch(/-\s*"5432:5432"/);
+    expect(compose).toMatch(/127\.0\.0\.1:5432:5432/);
+  });
+
+  it("publica o web só em 127.0.0.1 (atrás de proxy), não em todas as interfaces", () => {
+    expect(compose).not.toMatch(/-\s*"3000:3000"/);
+    expect(compose).toMatch(/127\.0\.0\.1:3000:3000/);
+  });
+
+  it("não traz a senha do banco fixa no repositório", () => {
+    expect(compose).not.toMatch(/glpi:glpi@/);
+    expect(compose).not.toMatch(/POSTGRES_PASSWORD:\s*glpi\b/);
+    expect(compose).toMatch(/POSTGRES_PASSWORD:\s*\$\{POSTGRES_PASSWORD:\?/);
+  });
+
+  it("roda os alvos web e worker como usuário não-root", () => {
+    const dockerfile = read("Dockerfile");
+    for (const target of ["web", "worker"]) {
+      const stage = dockerfile.split(new RegExp(`^FROM .* AS ${target}$`, "m"))[1] ?? "";
+      const body = stage.split(/^FROM /m)[0];
+      expect(body, `alvo ${target}`).toMatch(/^USER node$/m);
+    }
+  });
+
+  it("versiona o .env.example sem segredo pré-preenchido", () => {
+    expect(read(".gitignore")).toMatch(/^!\.env\.example$/m);
+    const example = read(".env.example");
+    expect(example).toMatch(/^SESSION_SECRET=$/m);
+    expect(example).toMatch(/^POSTGRES_PASSWORD=$/m);
+  });
+
+  it("inclui o texto da licença do React Bits junto dos componentes copiados", () => {
+    const license = read("src/components/bits/LICENSE.md");
+    expect(license).toContain("Commons Clause");
+    expect(license).toContain("David Haz");
+  });
+});
