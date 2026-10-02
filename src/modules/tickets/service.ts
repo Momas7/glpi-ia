@@ -1,12 +1,12 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/lib/db";
 import { AppError, ForbiddenError } from "@/lib/errors";
+import { escapeLike } from "@/lib/like";
 import { can, type SessionUser } from "@/modules/auth";
 import type { CreateTicketInput, ListTicketsQuery, TicketStatus, UpdateTicketInput } from "./schemas";
 
 const MAX_PAGE_SIZE = 100;
 
-const escapeLike = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 
 export class TicketNotFoundError extends AppError {
   constructor() {
