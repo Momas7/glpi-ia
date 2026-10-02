@@ -181,6 +181,13 @@ export async function patchTicket(
   });
 }
 
+function scopeWhere(actor: SessionUser, scope: ListTicketsQuery["scope"]): Prisma.TicketWhereInput {
+  if (scope === "assigned") return { assigneeId: actor.id };
+  if (scope === "team") return { teamId: { in: actor.teamIds } };
+  if (scope === "mine") return { requesterId: actor.id };
+  return {};
+}
+
 export async function listTickets(
   actor: SessionUser,
   query: ListTicketsQuery,
@@ -196,6 +203,7 @@ export async function listTickets(
       query.teamId ? { teamId: query.teamId } : {},
       query.assigneeId ? { assigneeId: query.assigneeId } : {},
       query.q ? { title: { contains: escapeLike(query.q), mode: "insensitive" } } : {},
+      scopeWhere(actor, query.scope),
     ],
   };
   const db = getDb();

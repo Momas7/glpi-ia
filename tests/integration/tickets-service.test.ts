@@ -217,3 +217,23 @@ describe("listagem", () => {
     expect(await titles("impressora")).toEqual(["Impressora 100% quebrada"]);
   });
 });
+
+describe("filtros rápidos (scope)", () => {
+  it("assigned, team e mine respeitam o ator e a visibilidade", async () => {
+    const a = await createInT1("atribuido");
+    await db.ticket.update({ where: { id: a.id }, data: { assigneeId: agent1.id } });
+    await createInT1("sem responsavel");
+    await create(agent1, "aberto pelo agente", { teamId: t2 });
+    const d = await create(reqB, "de outra pessoa");
+    await db.ticket.update({ where: { id: d.id }, data: { teamId: t2 } });
+
+    const titles = async (actor: typeof agent1, scope: "assigned" | "team" | "mine") =>
+      (await svc.listTickets(actor, { page: 1, pageSize: 50, scope })).items.map((i) => i.title).sort();
+
+    expect(await titles(agent1, "assigned")).toEqual(["atribuido"]);
+    expect(await titles(agent1, "team")).toEqual(["atribuido", "sem responsavel"]);
+    expect(await titles(agent1, "mine")).toEqual(["aberto pelo agente"]);
+    expect(await titles(reqA, "team")).toEqual([]);
+    expect(await titles(reqA, "mine")).toEqual(["atribuido", "sem responsavel"]);
+  });
+});

@@ -26,6 +26,7 @@ const isPlainText: Sniff = (d) => {
 const ALLOWED: Record<string, { mime: string; sniff: Sniff }> = {
   png: { mime: "image/png", sniff: startsWith(0x89, 0x50, 0x4e, 0x47) },
   jpg: { mime: "image/jpeg", sniff: startsWith(0xff, 0xd8, 0xff) },
+  jpeg: { mime: "image/jpeg", sniff: startsWith(0xff, 0xd8, 0xff) },
   pdf: { mime: "application/pdf", sniff: startsWith(0x25, 0x50, 0x44, 0x46) },
   txt: { mime: "text/plain", sniff: isPlainText },
   log: { mime: "text/plain", sniff: isPlainText },
@@ -50,7 +51,8 @@ export class AttachmentTooLargeError extends AppError {
   }
 }
 
-const uploadDir = () => path.resolve(process.env.UPLOAD_DIR ?? "./uploads");
+// O diretório de uploads é configurável e fica fora do bundle: os comentários evitam que o build rastreie o projeto inteiro.
+const uploadDir = () => path.resolve(/*turbopackIgnore: true*/ process.env.UPLOAD_DIR ?? "./uploads");
 
 /** Só o nome base, sem separadores nem caracteres de controle; usado apenas para exibição. */
 function displayName(original: string): string {
@@ -86,8 +88,8 @@ export async function saveAttachment(
   // O nome gravado é gerado aqui; o nome original nunca entra no caminho.
   const storedName = `${randomUUID()}.${ext}`;
   const dir = uploadDir();
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, storedName), file.data, { flag: "wx" });
+  await mkdir(/*turbopackIgnore: true*/ dir, { recursive: true });
+  await writeFile(/*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ dir, storedName), file.data, { flag: "wx" });
 
   return getDb().attachment.create({
     data: {
@@ -112,6 +114,6 @@ export async function getAttachmentFile(actor: SessionUser, ticketId: string, at
   if (!ticket) throw new TicketNotFoundError();
   const attachment = await getDb().attachment.findFirst({ where: { id: attachmentId, ticketId } });
   if (!attachment) throw new AppError(404, "Anexo não encontrado.");
-  const data = await readFile(path.join(uploadDir(), attachment.storedName));
+  const data = await readFile(/*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ uploadDir(), attachment.storedName));
   return { attachment, data };
 }
