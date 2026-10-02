@@ -83,3 +83,18 @@ describe("agendamento", () => {
     expect(schedules.map((s) => s.cron)).toContain("0 * * * *");
   });
 });
+
+describe("filas com dead letter", () => {
+  it("job que esgota as tentativas vai para o dead letter com o mesmo data", async () => {
+    const { defineQueue, enqueue, registerHandler } = await import("@/lib/queue");
+    await defineQueue("teste.dlq", {});
+    await defineQueue("teste.dlq-origem", { retryLimit: 0, deadLetter: "teste.dlq" });
+    await registerHandler("teste.dlq-origem", async () => {
+      throw new Error("sempre falha");
+    });
+    const dead = vi.fn(async () => {});
+    await registerHandler("teste.dlq", dead);
+    await enqueue("teste.dlq-origem", { deliveryId: "d-1" });
+    await vi.waitFor(() => expect(dead).toHaveBeenCalledWith({ deliveryId: "d-1" }), { timeout: 15000 });
+  });
+});
