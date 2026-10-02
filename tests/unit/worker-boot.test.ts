@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 describe("boot do worker", () => {
   it("sai com código 1 e cita a variável quando a configuração é inválida", () => {
     const r = spawnSync("npx", ["tsx", "--tsconfig", "tsconfig.json", "src/worker/index.ts"], {
-      env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "" },
+      env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "" } as unknown as NodeJS.ProcessEnv,
       encoding: "utf8",
       timeout: 30_000,
     });
