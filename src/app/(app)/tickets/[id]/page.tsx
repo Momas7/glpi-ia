@@ -2,13 +2,14 @@ import { notFound } from "next/navigation";
 import { AttachmentForm } from "@/components/forms/AttachmentForm";
 import { CommentForm } from "@/components/forms/CommentForm";
 import { StatusControl } from "@/components/forms/StatusControl";
+import { TicketActions } from "@/components/forms/TicketActions";
 import { SafeText } from "@/components/SafeText";
 import { PriorityBadge, StatusBadge } from "@/components/StatusBadges";
 import { Badge } from "@/components/ui/badge";
 import { TYPE_LABEL, formatDateTime } from "@/lib/labels";
 import { requireUser } from "@/lib/server-session";
 import { can } from "@/modules/auth";
-import { TRANSITIONS, getComments, getTicket, listAttachments } from "@/modules/tickets";
+import { TRANSITIONS, getComments, getTicket, listAssignmentOptions, listAttachments } from "@/modules/tickets";
 
 export const metadata = { title: "Chamado · Chamados IA" };
 
@@ -20,6 +21,8 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
 
   const [comments, attachments] = await Promise.all([getComments(user, id), listAttachments(user, id)]);
   const canChange = can(user, "ticket:update", ticket);
+  const canAssign = can(user, "ticket:assign", ticket);
+  const assignmentTeams = canAssign ? await listAssignmentOptions() : [];
   const next = canChange
     ? TRANSITIONS[ticket.status].filter((s) => s !== "CLOSED" || can(user, "ticket:close", ticket))
     : [];
@@ -37,6 +40,16 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
       </div>
 
       <StatusControl ticketId={ticket.id} next={next} />
+
+      <TicketActions
+        ticketId={ticket.id}
+        // Assumir exige ser membro da equipe do chamado (o serviço valida); só oferece a quem é.
+        canTake={can(user, "ticket:take", ticket) && !!ticket.teamId && user.teamIds.includes(ticket.teamId)}
+        canReopen={can(user, "ticket:reopen", ticket)}
+        canAssign={canAssign}
+        teams={assignmentTeams}
+        current={{ teamId: ticket.teamId, assigneeId: ticket.assigneeId }}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_16rem]">
         <div className="flex flex-col gap-6">

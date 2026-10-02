@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ROLE_LABEL } from "@/lib/labels";
-import { useAction } from "./useAction";
+import { useAction } from "@/components/useAction";
 
 export function InviteForm() {
   const { run, error, pending } = useAction();

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { ROLE_LABEL } from "@/lib/labels";
-import { useAction } from "./useAction";
+import { useAction } from "@/components/useAction";
 
 export function UserRowActions({ id, role, active, isSelf }: { id: string; role: string; active: boolean; isSelf: boolean }) {
   const { run, error, pending } = useAction();

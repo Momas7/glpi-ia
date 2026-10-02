@@ -67,3 +67,21 @@ export async function takeTicket(actor: SessionUser, id: string): Promise<Ticket
     return tx.ticket.findUniqueOrThrow({ where: { id }, include: ticketInclude });
   });
 }
+
+/** Equipes com seus técnicos ativos, para os selects de atribuição na tela. */
+export async function listAssignmentOptions(): Promise<{ id: string; name: string; members: { id: string; name: string }[] }[]> {
+  const teams = await getDb().team.findMany({
+    orderBy: { name: "asc" },
+    include: {
+      members: {
+        where: { user: { active: true, role: { in: ["AGENT", "TEAM_LEAD", "ADMIN"] } } },
+        include: { user: { select: { id: true, name: true } } },
+      },
+    },
+  });
+  return teams.map((t) => ({
+    id: t.id,
+    name: t.name,
+    members: t.members.map((m) => m.user).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+  }));
+}

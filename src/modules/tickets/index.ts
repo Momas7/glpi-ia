@@ -33,5 +33,5 @@ export {
   listAttachments,
   saveAttachment,
 } from "./attachments";
-export { assignTicket, takeTicket } from "./assignment";
+export { assignTicket, listAssignmentOptions, takeTicket } from "./assignment";
 export { autoCloseResolved, confirmTicket, reopenSchema, reopenTicket } from "./resolution";
