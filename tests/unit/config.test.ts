@@ -33,4 +33,10 @@ describe("loadConfig", () => {
   it("rejeita LLM_PROVIDER desconhecido", () => {
     expect(() => loadConfig({ ...base, LLM_PROVIDER: "openai" })).toThrowError(/LLM_PROVIDER/);
   });
+
+  it("AUTO_CLOSE_DAYS tem padrão 7 e recusa valores menores que 1", () => {
+    expect(loadConfig(base).AUTO_CLOSE_DAYS).toBe(7);
+    expect(loadConfig({ ...base, AUTO_CLOSE_DAYS: "3" }).AUTO_CLOSE_DAYS).toBe(3);
+    expect(() => loadConfig({ ...base, AUTO_CLOSE_DAYS: "0" })).toThrowError(/AUTO_CLOSE_DAYS/);
+  });
 });

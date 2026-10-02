@@ -7,3 +7,15 @@ export class AppError extends Error {
     super(message);
   }
 }
+
+export class ForbiddenError extends AppError {
+  constructor(message = "Sem permissão para esta ação.") {
+    super(403, message);
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(message: string) {
+    super(404, message);
+  }
+}
