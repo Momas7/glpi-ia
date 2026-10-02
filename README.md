@@ -19,7 +19,7 @@ Monólito modular com dois processos do mesmo código: `web` (UI e Route Handler
 Requisitos: Node 24+, Docker (ou Podman).
 
 ```bash
-cp .env.example .env        # ajuste SESSION_SECRET (openssl rand -hex 32)
+cp .env.example .env        # preencha SESSION_SECRET (openssl rand -hex 32), POSTGRES_PASSWORD (openssl rand -hex 16) e use a mesma senha no DATABASE_URL
 npm install
 docker compose up -d postgres
 npx prisma migrate deploy
@@ -28,7 +28,7 @@ npm run dev                 # web em http://localhost:3000
 npm run worker              # em outro terminal
 ```
 
-Stack completa em containers: `docker compose up --build` (exige `SESSION_SECRET` no `.env`).
+Stack completa em containers: `docker compose up --build` (exige `SESSION_SECRET` e `POSTGRES_PASSWORD` no `.env`). O Postgres só escuta em `127.0.0.1`. Atenção: o Postgres aplica `POSTGRES_PASSWORD` apenas na primeira criação do volume; para trocar a senha, recrie o volume (`docker compose down -v`, que apaga os dados).
 
 Testes: `npm test` (unitários) e `npm run test:integration` (precisa de Docker/Podman).
 
