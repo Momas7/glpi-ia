@@ -4,12 +4,24 @@ import { Button } from "@/components/ui/button";
 import { ROLE_LABEL } from "@/lib/labels";
 import { useAction } from "@/components/useAction";
 
-export function UserRowActions({ id, role, active, isSelf }: { id: string; role: string; active: boolean; isSelf: boolean }) {
+export function UserRowActions({
+  id,
+  name,
+  role,
+  active,
+  isSelf,
+}: {
+  id: string;
+  name: string;
+  role: string;
+  active: boolean;
+  isSelf: boolean;
+}) {
   const { run, error, pending } = useAction();
   return (
     <div className="flex flex-wrap items-center gap-2">
       <select
-        aria-label="Papel"
+        aria-label={`Papel de ${name}`}
         defaultValue={role}
         disabled={isSelf || pending}
         onChange={(e) => run(`/api/admin/users/${id}`, "PATCH", { role: e.target.value })}

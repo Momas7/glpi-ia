@@ -69,7 +69,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                   <Badge variant="outline">{u.active ? "Ativo" : "Desativado"}</Badge>
                 </TableCell>
                 <TableCell>
-                  <UserRowActions id={u.id} role={u.role} active={u.active} isSelf={u.id === user.id} />
+                  <UserRowActions id={u.id} name={u.name} role={u.role} active={u.active} isSelf={u.id === user.id} />
                 </TableCell>
               </TableRow>
             ))}
