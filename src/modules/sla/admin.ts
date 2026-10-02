@@ -111,5 +111,7 @@ export async function getSlaSettings(actor: SessionUser) {
     db.businessHours.findMany({ orderBy: { weekday: "asc" } }),
     db.holiday.findMany({ orderBy: { date: "asc" } }),
   ]);
-  return { policies, hours, holidays };
+  // Sem as 4 políticas e ao menos um dia de expediente, chamados ficam sem prazo.
+  const configured = policies.length === 4 && hours.some((h) => h.endMinute > h.startMinute);
+  return { policies, hours, holidays, configured };
 }

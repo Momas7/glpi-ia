@@ -44,6 +44,8 @@ read -rs ADMIN_PASSWORD && export ADMIN_PASSWORD
 npm run admin:create -- --email voce@empresa.com --name "Seu Nome"
 ```
 
+Rode também `npm run db:seed` (sem `SEED_DEMO_PASSWORD`): ele cria a equipe de entrada, categorias e equipes iniciais, as políticas de SLA, o expediente (seg–sex, 8h–18h) e os feriados nacionais. Tudo pode ser ajustado depois em **Administração**. Sem isso os chamados ficam sem prazo.
+
 Notas para o ambiente real: o `web` só escuta em `127.0.0.1:3000` e deve ficar atrás de um proxy com HTTPS (Caddy, na Fase 6); o cookie de sessão é `Secure`, então acessar por `http://servidor:3000` não mantém o login. `TRUSTED_PROXY_HOPS` diz quantos proxies seus existem na frente (padrão 1). Não use `SEED_DEMO_PASSWORD` em produção.
 
 ## Fases

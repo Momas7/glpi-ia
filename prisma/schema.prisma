@@ -179,6 +179,9 @@ model Ticket {
   resolutionBusinessMinutes    Int?
   slaWarnedAt                  DateTime?
   slaBreachedAt                DateTime?
+  /// Coluna GERADA no Postgres (migration 20261002000400): resolutionDue só para chamado ativo e não pausado.
+  /// Usada na ordem "vence primeiro". Somente leitura: nunca escrever.
+  slaSortDue                   DateTime?
 
   comments    Comment[]
   attachments Attachment[]

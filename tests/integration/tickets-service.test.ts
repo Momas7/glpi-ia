@@ -256,7 +256,9 @@ describe("filtros e ordem de SLA", () => {
     const titles = async (q: object) => (await svc.listTickets(agent1, { page: 1, pageSize: 50, ...q })).items.map((i) => i.title);
     expect(await titles({ sla: "breached" })).toEqual(["vencido"]);
     expect(await titles({ sla: "at_risk" })).toEqual(["em risco"]);
-    expect(await titles({ order: "due" })).toEqual(["pausado vencido", "vencido", "em risco", "em dia", "sem prazo"]);
+    await withDue("fechado há tempo", { resolutionDue: new Date(now - 900 * HOUR), slaResolutionMinutes: 240, status: "CLOSED" });
+    // ativos por prazo primeiro; depois pausados, encerrados e sem prazo, dos mais recentes aos mais antigos
+    expect(await titles({ order: "due" })).toEqual(["vencido", "em risco", "em dia", "fechado há tempo", "sem prazo", "pausado vencido"]);
   });
 
   it("ordem padrão: por prazo para a equipe, mais recentes para o solicitante", async () => {

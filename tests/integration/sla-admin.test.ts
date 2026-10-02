@@ -104,6 +104,16 @@ describe("feriados", () => {
   });
 });
 
+describe("configuração", () => {
+  it("indica quando o SLA não está configurado (sem políticas ou sem expediente)", async () => {
+    expect((await sla.getSlaSettings(admin)).configured).toBe(false); // só há política para LOW
+    await sla.updatePolicies(admin, (["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const).map((priority) => ({ priority, firstResponseMinutes: 60, resolutionMinutes: 240 })));
+    expect((await sla.getSlaSettings(admin)).configured).toBe(true);
+    await db.businessHours.deleteMany();
+    expect((await sla.getSlaSettings(admin)).configured).toBe(false);
+  });
+});
+
 describe("rotas", () => {
   async function call(mod: string, method: "PUT" | "POST" | "DELETE", c: string, body?: unknown, params: Record<string, string> = {}) {
     const m = await import(mod);

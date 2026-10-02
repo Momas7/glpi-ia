@@ -238,7 +238,7 @@ export async function listTickets(
       include,
       orderBy:
         (query.order ?? (actor.role === "REQUESTER" ? "recent" : "due")) === "due"
-          ? [{ resolutionDue: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }, { number: "desc" }]
+          ? [{ slaSortDue: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }, { number: "desc" }]
           : [{ createdAt: "desc" }, { number: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,

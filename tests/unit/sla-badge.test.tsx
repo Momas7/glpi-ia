@@ -16,6 +16,14 @@ describe("SlaBadge", () => {
     expect(container.textContent).toBe(text);
   });
 
+  it("no limite (0 min) não mostra duração zero", () => {
+    const { container } = render(<SlaBadge state="breached" remainingMinutes={-0} />);
+    expect(container.textContent).toBe("Vencido");
+    cleanup();
+    const risk = render(<SlaBadge state="at_risk" remainingMinutes={0} />);
+    expect(risk.container.textContent).toBe("Em risco · vence agora");
+  });
+
   it("não mostra nada sem prazo ou com o chamado encerrado", () => {
     for (const state of ["none", "done"] as const) {
       const { container } = render(<SlaBadge state={state} remainingMinutes={null} />);

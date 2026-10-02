@@ -107,6 +107,36 @@ describe("prazos", () => {
     expect(t.resolutionDue).toEqual(sp(5, 13));
   });
 
+  it("mudar prioridade zera as marcas de alerta (o job reavalia com o novo prazo)", async () => {
+    const id = await ticketAt(sp(5, 9));
+    await db.ticket.update({ where: { id }, data: { slaWarnedAt: sp(5, 12), slaBreachedAt: sp(5, 14) } });
+    await db.$transaction(async (tx) => {
+      await tx.ticket.update({ where: { id }, data: { priority: "LOW" } });
+      await sla.slaOnPriorityChange(tx, id, sp(5, 15));
+    });
+    const t = await row(id);
+    expect([t.slaWarnedAt, t.slaBreachedAt]).toEqual([null, null]);
+  });
+
+  it("chamado legado (sem prazo) que ganha política conta a partir de agora; em Pendente fica pausado", async () => {
+    const legacy = await db.ticket.create({
+      data: { title: "antigo", description: "d", requesterId: req.id, teamId, priority: "LOW", status: "OPEN", createdAt: sp(1, 9) },
+    });
+    const legacyPending = await db.ticket.create({
+      data: { title: "antigo pendente", description: "d", requesterId: req.id, teamId, priority: "LOW", status: "PENDING", createdAt: sp(1, 9) },
+    });
+    for (const id of [legacy.id, legacyPending.id]) {
+      await db.$transaction(async (tx) => {
+        await tx.ticket.update({ where: { id }, data: { priority: "CRITICAL" } });
+        await sla.slaOnPriorityChange(tx, id, sp(5, 9));
+      });
+    }
+    expect((await row(legacy.id)).resolutionDue).toEqual(sp(5, 13)); // segunda 9h + 240 min úteis
+    const pending = await row(legacyPending.id);
+    expect(pending.pausedAt).toEqual(sp(5, 9));
+    expect(sla.slaState(pending, sp(9, 17), await sla.loadCalendar()).state).toBe("paused");
+  });
+
   it("1ª resposta: só comentário público de técnico, uma vez", async () => {
     const id = await ticketAt(sp(5, 9));
     const comment = (author: SessionUser, internal: boolean, now: Date) =>

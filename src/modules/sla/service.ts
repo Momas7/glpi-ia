@@ -51,19 +51,39 @@ function deadlines(t: SlaFields, cal: BusinessCalendar) {
   }
 }
 
-async function applyPolicy(tx: Tx, ticketId: string): Promise<void> {
+const PAUSED_STATUSES = ["PENDING", "RESOLVED", "CLOSED"];
+
+/**
+ * Aplica a política da prioridade atual e recalcula os prazos. Zera as marcas de alerta (o job reavalia com o novo
+ * prazo). Chamado que ainda não tinha SLA (legado) começa a contar a partir de `now`; chamado em pausa sem `pausedAt`
+ * passa a ficar pausado.
+ */
+async function applyPolicy(tx: Tx, ticketId: string, now: Date, opts: { isCreation: boolean }): Promise<void> {
   const t = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId } });
   const policy = await tx.slaPolicy.findUnique({ where: { priority: t.priority } });
   if (!policy) {
     logger.warn({ ticketId, priority: t.priority }, "sem política de SLA para a prioridade");
     await tx.ticket.update({
       where: { id: ticketId },
-      data: { slaFirstResponseMinutes: null, slaResolutionMinutes: null, firstResponseDue: null, resolutionDue: null },
+      data: {
+        slaFirstResponseMinutes: null,
+        slaResolutionMinutes: null,
+        firstResponseDue: null,
+        resolutionDue: null,
+        slaWarnedAt: null,
+        slaBreachedAt: null,
+      },
     });
     return;
   }
-  const fields = { ...t, slaFirstResponseMinutes: policy.firstResponseMinutes, slaResolutionMinutes: policy.resolutionMinutes };
-  const due = deadlines(fields, await loadCalendar(tx));
+  const cal = await loadCalendar(tx);
+  let pausedMinutes = t.pausedMinutes;
+  if (!opts.isCreation && t.slaResolutionMinutes == null) {
+    pausedMinutes += businessMinutesBetween(t.createdAt, now, cal); // legado: o tempo antes de ter SLA não conta
+  }
+  const pausedAt = t.pausedAt ?? (PAUSED_STATUSES.includes(t.status) ? now : null);
+  const fields = { ...t, pausedMinutes, slaFirstResponseMinutes: policy.firstResponseMinutes, slaResolutionMinutes: policy.resolutionMinutes };
+  const due = deadlines(fields, cal);
   await tx.ticket.update({
     where: { id: ticketId },
     data: {
@@ -71,17 +91,21 @@ async function applyPolicy(tx: Tx, ticketId: string): Promise<void> {
       slaResolutionMinutes: policy.resolutionMinutes,
       firstResponseDue: due?.firstResponseDue ?? null,
       resolutionDue: due?.resolutionDue ?? null,
+      pausedMinutes,
+      pausedAt,
+      slaWarnedAt: null,
+      slaBreachedAt: null,
     },
   });
 }
 
-export async function slaOnCreate(tx: Tx, ticketId: string, _now: Date): Promise<void> {
-  await applyPolicy(tx, ticketId);
+export async function slaOnCreate(tx: Tx, ticketId: string, now: Date): Promise<void> {
+  await applyPolicy(tx, ticketId, now, { isCreation: true });
 }
 
 /** Mudança de prioridade: minutos da nova política, mantendo as pausas já acumuladas. */
-export async function slaOnPriorityChange(tx: Tx, ticketId: string, _now: Date): Promise<void> {
-  await applyPolicy(tx, ticketId);
+export async function slaOnPriorityChange(tx: Tx, ticketId: string, now: Date): Promise<void> {
+  await applyPolicy(tx, ticketId, now, { isCreation: false });
 }
 
 /**

@@ -22,5 +22,10 @@ export const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Administrador",
 };
 
-const dateTime = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" });
+// Sempre no fuso da empresa: o servidor pode estar em UTC.
+const dateTime = new Intl.DateTimeFormat("pt-BR", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: process.env.APP_TIMEZONE || "America/Sao_Paulo",
+});
 export const formatDateTime = (d: Date | string) => dateTime.format(new Date(d));
