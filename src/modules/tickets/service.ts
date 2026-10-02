@@ -68,7 +68,15 @@ export async function getTicket(actor: SessionUser, id: string): Promise<TicketW
   return ticket;
 }
 
-export async function createTicket(actor: SessionUser, input: CreateTicketInput): Promise<TicketWithRefs> {
+/** Origem do chamado quando não vem da tela: integração por chave de API (n8n). */
+export interface TicketOrigin {
+  source: "API";
+  apiKeyId: string;
+  apiKeyName: string;
+  externalRef?: string;
+}
+
+export async function createTicket(actor: SessionUser, input: CreateTicketInput, origin?: TicketOrigin): Promise<TicketWithRefs> {
   if (!can(actor, "ticket:create")) throw new ForbiddenError();
   const db = getDb();
   return db.$transaction(async (tx) => {
@@ -93,11 +101,12 @@ export async function createTicket(actor: SessionUser, input: CreateTicketInput)
         categoryId: input.categoryId,
         teamId,
         requesterId: actor.id,
+        ...(origin ? { source: origin.source, apiKeyId: origin.apiKeyId, externalRef: origin.externalRef } : {}),
       },
       include,
     });
     await tx.ticketEvent.create({
-      data: { ticketId: ticket.id, actorId: actor.id, type: "CREATED", data: { number: ticket.number } },
+      data: { ticketId: ticket.id, actorId: actor.id, type: "CREATED", data: { number: ticket.number, ...(origin ? { via: origin.apiKeyName } : {}) } },
     });
     await emitTicketEvent(tx, "ticket.created", ticket.id);
     for (const hook of createdHooks) await hook(tx, ticket);

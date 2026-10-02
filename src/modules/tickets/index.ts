@@ -10,6 +10,7 @@ export {
   patchTicket,
   registerTicketCreatedHook,
   updateTicket,
+  type TicketOrigin,
   type TicketWithRefs,
 } from "./service";
 export {
@@ -35,3 +36,4 @@ export {
 } from "./attachments";
 export { assignTicket, listAssignmentOptions, releaseAssignments, takeTicket } from "./assignment";
 export { autoCloseResolved, confirmTicket, reopenSchema, reopenTicket } from "./resolution";
+export { addCommentFromApi, createTicketFromApi } from "./inbound";

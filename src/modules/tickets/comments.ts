@@ -10,7 +10,12 @@ export const commentSchema = z.object({
 });
 
 /** O texto é guardado como veio; o escape acontece na renderização (SafeText). */
-export async function addComment(actor: SessionUser, ticketId: string, input: z.infer<typeof commentSchema>) {
+export async function addComment(
+  actor: SessionUser,
+  ticketId: string,
+  input: z.infer<typeof commentSchema>,
+  origin?: { source: "API"; externalRef?: string },
+) {
   const ticket = await getTicket(actor, ticketId);
   if (!ticket) throw new TicketNotFoundError();
   if (!can(actor, "comment:create", ticket)) throw new ForbiddenError();
@@ -19,7 +24,14 @@ export async function addComment(actor: SessionUser, ticketId: string, input: z.
   const db = getDb();
   return db.$transaction(async (tx) => {
     const comment = await tx.comment.create({
-      data: { ticketId, authorId: actor.id, body: input.body, internal: input.internal, source: "WEB" },
+      data: {
+        ticketId,
+        authorId: actor.id,
+        body: input.body,
+        internal: input.internal,
+        source: origin?.source ?? "WEB",
+        externalRef: origin?.externalRef,
+      },
       include: { author: { select: { id: true, name: true } } },
     });
     await tx.ticketEvent.create({

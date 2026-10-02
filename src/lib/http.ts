@@ -3,7 +3,8 @@ import { z } from "zod";
 import { readBodyLimited } from "@/lib/body";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { can, getRequestUser, type SessionUser } from "@/modules/auth";
+import { can, checkRateLimit, getRequestUser, type SessionUser } from "@/modules/auth";
+import { authenticateApiKey, type ApiScope } from "@/modules/integrations";
 
 z.config(z.locales.ptBR());
 
@@ -86,4 +87,24 @@ export function withAdmin<P = Record<string, never>>(handler: (ctx: AuthedContex
     if (!can(ctx.user, "admin:manage")) throw new ForbiddenError();
     return handler(ctx);
   });
+}
+
+export interface ApiKeyContext<P> {
+  req: Request;
+  apiKey: { id: string; name: string };
+  params: P;
+}
+
+/** Rotas /api/v1 (integrações): chave de API com escopo, 60 requisições/min por chave, erros em JSON. */
+export function withApiKey<P = Record<string, never>>(scope: ApiScope, handler: (ctx: ApiKeyContext<P>) => Promise<Response>) {
+  return async (req: Request, routeCtx?: { params: Promise<P> }): Promise<Response> => {
+    try {
+      const apiKey = await authenticateApiKey(req.headers.get("authorization"), scope);
+      if (!checkRateLimit(`apikey:${apiKey.id}`, 60, 60)) return jsonError(429, "Limite de requisições excedido.");
+      const params = (routeCtx ? await routeCtx.params : {}) as P;
+      return await handler({ req, apiKey, params });
+    } catch (err) {
+      return errorResponse(err);
+    }
+  };
 }
