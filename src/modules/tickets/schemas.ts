@@ -44,6 +44,10 @@ export const listQuerySchema = z.object({
   q: z.string().trim().min(1).max(200).optional(),
   // Filtros rápidos: atribuídos a mim, da minha equipe, abertos por mim.
   scope: z.enum(["assigned", "team", "mine"]).optional(),
+  // SLA: "Vencendo" (marcado pelo job a cada 5 min) e "Vencidos" (pelo prazo gravado).
+  sla: z.enum(["at_risk", "breached"]).optional(),
+  // Ordem: por prazo de resolução (padrão da equipe) ou mais recentes (padrão do solicitante).
+  order: z.enum(["due", "recent"]).optional(),
 });
 
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;

@@ -237,3 +237,38 @@ describe("filtros rápidos (scope)", () => {
     expect(await titles(reqA, "mine")).toEqual(["atribuido", "sem responsavel"]);
   });
 });
+
+describe("filtros e ordem de SLA", () => {
+  const HOUR = 3600_000;
+  async function withDue(title: string, data: object) {
+    const t = await createInT1(title);
+    return db.ticket.update({ where: { id: t.id }, data: { status: "OPEN", ...data } });
+  }
+
+  it("Vencidos, Vencendo, pausados e chamados sem prazo", async () => {
+    const now = Date.now();
+    await withDue("vencido", { resolutionDue: new Date(now - HOUR), slaResolutionMinutes: 240 });
+    await withDue("em risco", { resolutionDue: new Date(now + HOUR), slaResolutionMinutes: 240, slaWarnedAt: new Date(now - 60_000) });
+    await withDue("em dia", { resolutionDue: new Date(now + 5 * HOUR), slaResolutionMinutes: 240 });
+    await withDue("pausado vencido", { resolutionDue: new Date(now - HOUR), slaResolutionMinutes: 240, pausedAt: new Date(now - 2 * HOUR), status: "PENDING" });
+    await withDue("sem prazo", {});
+
+    const titles = async (q: object) => (await svc.listTickets(agent1, { page: 1, pageSize: 50, ...q })).items.map((i) => i.title);
+    expect(await titles({ sla: "breached" })).toEqual(["vencido"]);
+    expect(await titles({ sla: "at_risk" })).toEqual(["em risco"]);
+    expect(await titles({ order: "due" })).toEqual(["pausado vencido", "vencido", "em risco", "em dia", "sem prazo"]);
+  });
+
+  it("ordem padrão: por prazo para a equipe, mais recentes para o solicitante", async () => {
+    const now = Date.now();
+    await withDue("aberto antes, vence antes", { resolutionDue: new Date(now + HOUR), slaResolutionMinutes: 240 });
+    await new Promise((r) => setTimeout(r, 20));
+    await withDue("aberto depois, vence depois", { resolutionDue: new Date(now + 9 * HOUR), slaResolutionMinutes: 240 });
+    const first = async (actor: typeof agent1, order?: "due" | "recent") =>
+      (await svc.listTickets(actor, { page: 1, pageSize: 50, ...(order ? { order } : {}) })).items[0].title;
+    expect(await first(agent1)).toBe("aberto antes, vence antes");
+    expect(await first(reqA)).toBe("aberto depois, vence depois");
+    expect(await first(agent1, "recent")).toBe("aberto depois, vence depois");
+    expect(await first(reqA, "due")).toBe("aberto antes, vence antes");
+  });
+});

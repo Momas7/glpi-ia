@@ -198,6 +198,13 @@ export async function patchTicket(
   });
 }
 
+function slaWhere(sla: ListTicketsQuery["sla"], now: Date): Prisma.TicketWhereInput {
+  if (!sla) return {};
+  const open: Prisma.TicketWhereInput = { status: { notIn: ["RESOLVED", "CLOSED"] }, pausedAt: null };
+  if (sla === "breached") return { ...open, resolutionDue: { lt: now } };
+  return { ...open, slaWarnedAt: { not: null }, resolutionDue: { gte: now } };
+}
+
 function scopeWhere(actor: SessionUser, scope: ListTicketsQuery["scope"]): Prisma.TicketWhereInput {
   if (scope === "assigned") return { assigneeId: actor.id };
   if (scope === "team") return { teamId: { in: actor.teamIds } };
@@ -221,6 +228,7 @@ export async function listTickets(
       query.assigneeId ? { assigneeId: query.assigneeId } : {},
       query.q ? { title: { contains: escapeLike(query.q), mode: "insensitive" } } : {},
       scopeWhere(actor, query.scope),
+      slaWhere(query.sla, new Date()),
     ],
   };
   const db = getDb();
@@ -228,7 +236,10 @@ export async function listTickets(
     db.ticket.findMany({
       where,
       include,
-      orderBy: [{ createdAt: "desc" }, { number: "desc" }],
+      orderBy:
+        (query.order ?? (actor.role === "REQUESTER" ? "recent" : "due")) === "due"
+          ? [{ resolutionDue: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }, { number: "desc" }]
+          : [{ createdAt: "desc" }, { number: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),

@@ -4,11 +4,13 @@ import { CommentForm } from "@/components/forms/CommentForm";
 import { StatusControl } from "@/components/forms/StatusControl";
 import { TicketActions } from "@/components/forms/TicketActions";
 import { SafeText } from "@/components/SafeText";
+import { SlaBadge } from "@/components/SlaBadge";
 import { PriorityBadge, StatusBadge } from "@/components/StatusBadges";
 import { Badge } from "@/components/ui/badge";
 import { TYPE_LABEL, formatDateTime } from "@/lib/labels";
 import { requireUser } from "@/lib/server-session";
 import { can } from "@/modules/auth";
+import { loadCalendar, slaState } from "@/modules/sla";
 import { TRANSITIONS, getComments, getTicket, listAssignmentOptions, listAttachments } from "@/modules/tickets";
 
 export const metadata = { title: "Chamado · Chamados IA" };
@@ -20,6 +22,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
   if (!ticket) notFound();
 
   const [comments, attachments] = await Promise.all([getComments(user, id), listAttachments(user, id)]);
+  const sla = slaState(ticket, new Date(), await loadCalendar());
   const canChange = can(user, "ticket:update", ticket);
   const canAssign = can(user, "ticket:assign", ticket);
   const assignmentTeams = canAssign ? await listAssignmentOptions() : [];
@@ -36,6 +39,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
           <StatusBadge status={ticket.status} />
           <PriorityBadge priority={ticket.priority} />
           <Badge variant="outline">{TYPE_LABEL[ticket.type]}</Badge>
+          <SlaBadge {...sla} />
         </div>
       </div>
 
@@ -86,6 +90,17 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
             <Meta label="Equipe" value={ticket.team?.name ?? "—"} />
             <Meta label="Categoria" value={ticket.category?.name ?? "—"} />
             <Meta label="Criado em" value={formatDateTime(ticket.createdAt)} />
+            {ticket.firstResponseDue && (
+              <Meta
+                label="1ª resposta"
+                value={
+                  ticket.firstRespondedAt
+                    ? `respondido em ${formatDateTime(ticket.firstRespondedAt)}`
+                    : `até ${formatDateTime(ticket.firstResponseDue)}`
+                }
+              />
+            )}
+            {ticket.resolutionDue && <Meta label="Resolução até" value={formatDateTime(ticket.resolutionDue)} />}
             {ticket.source === "API" && <Meta label="Origem" value={`Aberto via API (${ticket.apiKey?.name ?? "chave removida"})`} />}
             {ticket.resolvedAt && <Meta label="Resolvido em" value={formatDateTime(ticket.resolvedAt)} />}
           </dl>
