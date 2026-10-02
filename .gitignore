@@ -40,7 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-.superpowers/
 
 # uploads
 /uploads
@@ -53,3 +52,7 @@ next-env.d.ts
 /.e2e-uploads
 /test-results
 /playwright-report
+
+# arquivos gerados por ferramentas de desenvolvimento
+/CLAUDE.md
+/AGENTS.md
