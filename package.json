@@ -13,7 +13,8 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "worker": "SERVICE_NAME=worker tsx --tsconfig tsconfig.json src/worker/index.ts"
+    "worker": "SERVICE_NAME=worker tsx --tsconfig tsconfig.json src/worker/index.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -38,6 +39,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@testcontainers/postgresql": "^12.2.0",
     "@testing-library/dom": "^10.4.2",
