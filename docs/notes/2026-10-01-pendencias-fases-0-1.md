@@ -38,6 +38,18 @@ Registro do que ficou adiado nas revisões independentes e das decisões que mud
 - Seed demo não valida a política de senha nem recusa `NODE_ENV=production`.
 - Testes: asserções `toThrow()` genéricas; faltam teste do limite por e-mail no login, corrida no aceite de convite e atribuição pelo líder via HTTP; `seed.test.ts` depende da ordem dos `describe`.
 
+## Minor adiados (Fase 2.1, gestão)
+
+- `assignTicket` não trava o chamado: duas atribuições simultâneas (líder × líder, ou líder × "Assumir") sobrescrevem sem aviso.
+- Corrida entre revogar e aceitar convite pode marcar como revogado um convite que já virou usuário.
+- Select de papel e botão "Desativar" agem sem confirmação e não voltam ao valor anterior quando a API recusa.
+- Convidar um e-mail que já tem conta gera link que sempre falha, sem aviso; falta "reenviar" na lista de pendentes.
+- "Assumir" e "Salvar atribuição" aparecem em chamados resolvidos ou fechados.
+- Admin rebaixado durante uma requisição ainda a conclui (janela pequena entre checagem e transação).
+- `autoCloseResolved` relê `AUTO_CLOSE_DAYS` do ambiente; valor vazio vira 0 se chamado fora do worker.
+- Faltam testes do agendamento do worker e das rotas de reabrir/confirmar para outro solicitante.
+- Atribuição sem mudança ainda grava evento ASSIGNED.
+
 ## Decisões de produto/segurança não resolvidas
 
 - Bloqueio de conta por 5 falhas permite que terceiros bloqueiem um colega repetidamente (negação de serviço). Mitigar (bloqueio por IP+conta, atraso progressivo) é decisão de produto.
