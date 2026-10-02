@@ -1,6 +1,7 @@
 export {
   ForbiddenError,
   InvalidTransitionError,
+  TRANSITIONS,
   TicketNotFoundError,
   changeStatus,
   createTicket,

@@ -24,7 +24,7 @@ export class InvalidTransitionError extends AppError {
   }
 }
 
-const TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
+export const TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   NEW: ["OPEN"],
   OPEN: ["PENDING", "RESOLVED"],
   PENDING: ["OPEN"],
