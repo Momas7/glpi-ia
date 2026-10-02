@@ -13,3 +13,4 @@ export { hashPassword, validatePasswordPolicy, verifyPassword } from "./password
 export { createInvite, acceptInvite } from "./invite";
 export { requestReset, resetPassword } from "./reset";
 export { getRequestUser, readSessionToken } from "./request";
+export { can, type Action, type TicketResource } from "./can";
