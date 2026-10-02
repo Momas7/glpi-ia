@@ -47,6 +47,12 @@ beforeEach(async () => {
 const create = (actor: SessionUser, title = "Chamado", extra: object = {}) =>
   svc.createTicket(actor, { title, description: "descrição", ...extra });
 
+// Solicitante não escolhe a equipe ao criar; a triagem (humana ou IA) atribui depois.
+const createInT1 = async (title = "Chamado") => {
+  const t = await create(reqA, title);
+  return db.ticket.update({ where: { id: t.id }, data: { teamId: t1 } });
+};
+
 describe("criação", () => {
   it("gera números consecutivos e registra o evento CREATED", async () => {
     const a = await create(reqA);
@@ -61,6 +67,11 @@ describe("criação", () => {
   it("20 criações simultâneas geram 20 números distintos", async () => {
     const all = await Promise.all(Array.from({ length: 20 }, (_, i) => create(reqA, `c${i}`)));
     expect(new Set(all.map((t) => t.number)).size).toBe(20);
+  });
+
+  it("ignora o teamId informado por solicitante, mas respeita o de agentes", async () => {
+    expect((await create(reqA, "a", { teamId: t1 })).teamId).toBeNull();
+    expect((await create(agent1, "b", { teamId: t1 })).teamId).toBe(t1);
   });
 
   it("aplica a equipe padrão da categoria", async () => {
@@ -81,12 +92,12 @@ describe("criação", () => {
 
 describe("status", () => {
   it("rejeita transição inválida (NEW→CLOSED)", async () => {
-    const t = await create(reqA, "x", { teamId: t1 });
+    const t = await createInT1("x");
     await expect(svc.changeStatus(agent1, t.id, "CLOSED")).rejects.toThrow(/transição/i);
   });
 
   it("segue NEW→OPEN→RESOLVED→CLOSED, preenchendo resolvedAt/closedAt, e limpa resolvedAt ao reabrir", async () => {
-    const t = await create(reqA, "x", { teamId: t1 });
+    const t = await createInT1("x");
     await svc.changeStatus(agent1, t.id, "OPEN");
     const resolved = await svc.changeStatus(agent1, t.id, "RESOLVED");
     expect(resolved.resolvedAt).not.toBeNull();
@@ -114,14 +125,14 @@ describe("visibilidade e permissões", () => {
   });
 
   it("agente de outra equipe não vê; da equipe vê; admin vê tudo", async () => {
-    const t = await create(reqA, "da equipe 1", { teamId: t1 });
+    const t = await createInT1("da equipe 1");
     expect(await svc.getTicket(agent2, t.id)).toBeNull();
     expect(await svc.getTicket(agent1, t.id)).not.toBeNull();
     expect(await svc.getTicket(admin, t.id)).not.toBeNull();
   });
 
   it("updateTicket: agente edita; solicitante é negado; outra equipe recebe 'não encontrado'", async () => {
-    const t = await create(reqA, "x", { teamId: t1 });
+    const t = await createInT1("x");
     const up = await svc.updateTicket(agent1, t.id, { priority: "HIGH" });
     expect(up.priority).toBe("HIGH");
     await expect(svc.updateTicket(reqA, t.id, { priority: "LOW" })).rejects.toThrow();
@@ -131,7 +142,7 @@ describe("visibilidade e permissões", () => {
   });
 
   it("atribuir: agente é negado, líder da equipe consegue", async () => {
-    const t = await create(reqA, "x", { teamId: t1 });
+    const t = await createInT1("x");
     await expect(svc.updateTicket(agent1, t.id, { assigneeId: agent1.id })).rejects.toThrow();
     const up = await svc.updateTicket(lead1, t.id, { assigneeId: agent1.id });
     expect(up.assigneeId).toBe(agent1.id);
@@ -151,8 +162,8 @@ describe("listagem", () => {
   });
 
   it("filtra por status", async () => {
-    const t = await create(reqA, "a", { teamId: t1 });
-    await create(reqA, "b", { teamId: t1 });
+    const t = await createInT1("a");
+    await createInT1("b");
     await svc.changeStatus(agent1, t.id, "OPEN");
     const open = await svc.listTickets(agent1, { page: 1, pageSize: 20, status: "OPEN" });
     expect(open.items.map((i) => i.title)).toEqual(["a"]);
