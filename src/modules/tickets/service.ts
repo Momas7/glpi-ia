@@ -7,7 +7,6 @@ import type { CreateTicketInput, ListTicketsQuery, TicketStatus, UpdateTicketInp
 
 const MAX_PAGE_SIZE = 100;
 
-
 export class TicketNotFoundError extends AppError {
   constructor() {
     super(404, "Chamado não encontrado.");
@@ -28,12 +27,13 @@ export const TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   CLOSED: [],
 };
 
-const include = {
+export const ticketInclude = {
   requester: { select: { id: true, name: true } },
   assignee: { select: { id: true, name: true } },
   team: { select: { id: true, name: true } },
   category: { select: { id: true, name: true } },
 } satisfies Prisma.TicketInclude;
+const include = ticketInclude;
 
 export type TicketWithRefs = Prisma.TicketGetPayload<{ include: typeof include }>;
 type Tx = Prisma.TransactionClient;
@@ -55,7 +55,7 @@ function visibilityWhere(actor: SessionUser): Prisma.TicketWhereInput {
   };
 }
 
-async function loadVisible(actor: SessionUser, id: string): Promise<TicketWithRefs> {
+export async function loadVisible(actor: SessionUser, id: string): Promise<TicketWithRefs> {
   const ticket = await getTicket(actor, id);
   if (!ticket) throw new TicketNotFoundError();
   return ticket;
@@ -71,12 +71,13 @@ export async function createTicket(actor: SessionUser, input: CreateTicketInput)
   if (!can(actor, "ticket:create")) throw new ForbiddenError();
   const db = getDb();
   return db.$transaction(async (tx) => {
+    const category = input.categoryId ? await requireCategory(tx, input.categoryId) : null;
     // Solicitante não escolhe a equipe: a triagem (humana ou da IA) decide.
     let teamId = actor.role === "REQUESTER" ? null : (input.teamId ?? null);
-    if (!teamId && input.categoryId) {
-      const category = await tx.category.findUnique({ where: { id: input.categoryId } });
-      teamId = category?.defaultTeamId ?? null;
+    if (teamId && !(await tx.team.findUnique({ where: { id: teamId } }))) {
+      throw new AppError(400, "Equipe não encontrada.");
     }
+    if (!teamId && category) teamId = category.defaultTeamId ?? null;
     // Sem equipe definida, o chamado cai na equipe de entrada para não ficar invisível aos técnicos.
     if (!teamId) {
       const intake = await tx.team.findUnique({ where: { name: process.env.DEFAULT_INTAKE_TEAM ?? "Suporte N1" } });
@@ -102,11 +103,16 @@ export async function createTicket(actor: SessionUser, input: CreateTicketInput)
   });
 }
 
-export async function updateTicket(actor: SessionUser, id: string, patch: UpdateTicketInput): Promise<TicketWithRefs> {
-  const current = await loadVisible(actor, id);
+async function requireCategory(tx: Tx, categoryId: string) {
+  const category = await tx.category.findUnique({ where: { id: categoryId } });
+  if (!category) throw new AppError(400, "Categoria não encontrada.");
+  return category;
+}
+
+/** Aplica campos editáveis dentro de uma transação já aberta. */
+async function applyFields(tx: Tx, actor: SessionUser, current: TicketWithRefs, patch: UpdateTicketInput): Promise<void> {
   if (!can(actor, "ticket:update", current)) throw new ForbiddenError();
-  const touchesAssignment = "assigneeId" in patch || "teamId" in patch;
-  if (touchesAssignment && !can(actor, "ticket:assign", current)) throw new ForbiddenError();
+  if (patch.categoryId) await requireCategory(tx, patch.categoryId);
 
   const before: Record<string, unknown> = {};
   const after: Record<string, unknown> = {};
@@ -117,42 +123,61 @@ export async function updateTicket(actor: SessionUser, id: string, patch: Update
       after[key] = value;
     }
   }
-  if (Object.keys(after).length === 0) return current;
+  if (Object.keys(after).length === 0) return;
 
-  return getDb().$transaction(async (tx) => {
-    const updated = await tx.ticket.update({ where: { id }, data: patch, include });
-    await tx.ticketEvent.create({
-      data: { ticketId: id, actorId: actor.id, type: "UPDATED", data: { before, after } as Prisma.InputJsonValue },
-    });
-    return updated;
+  await tx.ticket.update({ where: { id: current.id }, data: patch });
+  await tx.ticketEvent.create({
+    data: { ticketId: current.id, actorId: actor.id, type: "UPDATED", data: { before, after } as Prisma.InputJsonValue },
   });
 }
 
-export async function changeStatus(actor: SessionUser, id: string, to: TicketStatus): Promise<TicketWithRefs> {
-  const current = await loadVisible(actor, id);
+/** Valida e aplica a transição de status dentro de uma transação já aberta. */
+async function applyStatus(tx: Tx, actor: SessionUser, current: TicketWithRefs, to: TicketStatus): Promise<void> {
   if (!can(actor, "ticket:update", current)) throw new ForbiddenError();
   if (to === "CLOSED" && !can(actor, "ticket:close", current)) throw new ForbiddenError();
   if (!TRANSITIONS[current.status].includes(to)) throw new InvalidTransitionError(current.status, to);
 
   const now = new Date();
+  // Atualização condicional ao status lido: se outra pessoa mudou o chamado entretanto, count = 0.
+  const claimed = await tx.ticket.updateMany({
+    where: { id: current.id, status: current.status },
+    data: {
+      status: to,
+      resolvedAt: to === "RESOLVED" ? now : to === "OPEN" ? null : undefined,
+      closedAt: to === "CLOSED" ? now : undefined,
+    },
+  });
+  if (claimed.count !== 1) {
+    throw new AppError(409, "O chamado foi alterado por outra pessoa. Atualize a página e tente de novo.");
+  }
+  await tx.ticketEvent.create({
+    data: { ticketId: current.id, actorId: actor.id, type: "STATUS_CHANGED", data: { from: current.status, to } },
+  });
+}
+
+export async function updateTicket(actor: SessionUser, id: string, patch: UpdateTicketInput): Promise<TicketWithRefs> {
+  return patchTicket(actor, id, { fields: patch });
+}
+
+export async function changeStatus(actor: SessionUser, id: string, to: TicketStatus): Promise<TicketWithRefs> {
+  return patchTicket(actor, id, { fields: {}, status: to });
+}
+
+/** Campos e status numa única transação: se a transição for inválida, nenhum campo é gravado. */
+export async function patchTicket(
+  actor: SessionUser,
+  id: string,
+  input: { fields: UpdateTicketInput; status?: TicketStatus },
+): Promise<TicketWithRefs> {
+  const current = await loadVisible(actor, id);
   return getDb().$transaction(async (tx) => {
-    // Atualização condicional ao status lido: se outra pessoa mudou o chamado entretanto, count = 0.
-    const claimed = await tx.ticket.updateMany({
-      where: { id, status: current.status },
-      data: {
-        status: to,
-        resolvedAt: to === "RESOLVED" ? now : to === "OPEN" ? null : undefined,
-        closedAt: to === "CLOSED" ? now : undefined,
-      },
-    });
-    if (claimed.count !== 1) {
-      throw new AppError(409, "O chamado foi alterado por outra pessoa. Atualize a página e tente de novo.");
+    if (input.status) {
+      // Valida a transição antes de tocar nos campos (falha cedo, sem gravar nada).
+      if (!TRANSITIONS[current.status].includes(input.status)) throw new InvalidTransitionError(current.status, input.status);
     }
-    const updated = await tx.ticket.findUniqueOrThrow({ where: { id }, include });
-    await tx.ticketEvent.create({
-      data: { ticketId: id, actorId: actor.id, type: "STATUS_CHANGED", data: { from: current.status, to } },
-    });
-    return updated;
+    if (Object.keys(input.fields).length > 0) await applyFields(tx, actor, current, input.fields);
+    if (input.status) await applyStatus(tx, actor, current, input.status);
+    return tx.ticket.findUniqueOrThrow({ where: { id }, include });
   });
 }
 

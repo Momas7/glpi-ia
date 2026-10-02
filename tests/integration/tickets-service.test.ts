@@ -178,8 +178,9 @@ describe("visibilidade e permissões", () => {
 
   it("atribuir: agente é negado, líder da equipe consegue", async () => {
     const t = await createInT1("x");
-    await expect(svc.updateTicket(agent1, t.id, { assigneeId: agent1.id })).rejects.toThrow();
-    const up = await svc.updateTicket(lead1, t.id, { assigneeId: agent1.id });
+    await db.teamMember.create({ data: { userId: agent1.id, teamId: t1 } }).catch(() => {});
+    await expect(svc.assignTicket(agent1, t.id, { assigneeId: agent1.id })).rejects.toThrow();
+    const up = await svc.assignTicket(lead1, t.id, { assigneeId: agent1.id });
     expect(up.assigneeId).toBe(agent1.id);
   });
 });
