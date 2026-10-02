@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { readBodyLimited } from "@/lib/body";
-import { AppError } from "@/lib/errors";
+import { AppError, ForbiddenError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { getRequestUser, type SessionUser } from "@/modules/auth";
+import { can, getRequestUser, type SessionUser } from "@/modules/auth";
 
 z.config(z.locales.ptBR());
 
@@ -78,4 +78,12 @@ export function withErrors(handler: (req: Request) => Promise<Response>) {
       return errorResponse(err);
     }
   };
+}
+
+/** Rotas /api/admin: além de autenticar, exige admin:manage antes de ler o corpo (403 vem antes de 400). */
+export function withAdmin<P = Record<string, never>>(handler: (ctx: AuthedContext<P>) => Promise<Response>) {
+  return withAuth<P>(async (ctx) => {
+    if (!can(ctx.user, "admin:manage")) throw new ForbiddenError();
+    return handler(ctx);
+  });
 }

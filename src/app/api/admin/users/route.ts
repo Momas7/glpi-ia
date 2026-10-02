@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { withAuth } from "@/lib/http";
+import { withAdmin } from "@/lib/http";
 import { listUsers } from "@/modules/admin";
 
 const querySchema = z.object({
@@ -9,7 +9,7 @@ const querySchema = z.object({
   q: z.string().trim().max(200).optional(),
 });
 
-export const GET = withAuth(async ({ req, user }) => {
+export const GET = withAdmin(async ({ req, user }) => {
   const query = querySchema.parse(Object.fromEntries(new URL(req.url).searchParams));
   return NextResponse.json(await listUsers(user, query));
 });
