@@ -19,6 +19,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/tickets/new" className="text-muted-foreground hover:text-foreground">
             Novo chamado
           </Link>
+          {user.role === "ADMIN" && (
+            <Link href="/admin" className="text-muted-foreground hover:text-foreground">
+              Administração
+            </Link>
+          )}
         </nav>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span>
