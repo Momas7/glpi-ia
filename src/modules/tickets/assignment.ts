@@ -50,6 +50,8 @@ export async function assignTicket(actor: SessionUser, id: string, input: Assign
 /** O técnico assume para si um chamado da equipe sem responsável. Dois cliques simultâneos: um recebe 409. */
 export async function takeTicket(actor: SessionUser, id: string): Promise<TicketWithRefs> {
   const current = await loadVisible(actor, id);
+  // Página desatualizada: outra pessoa já assumiu. Mensagem clara (409) antes da checagem de permissão.
+  if (current.assigneeId) throw new AppError(409, "Este chamado já foi assumido por outra pessoa.");
   if (!can(actor, "ticket:take", current)) throw new ForbiddenError();
 
   return getDb().$transaction(async (tx) => {
@@ -84,4 +86,32 @@ export async function listAssignmentOptions(): Promise<{ id: string; name: strin
     name: t.name,
     members: t.members.map((m) => m.user).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
   }));
+}
+
+/**
+ * Tira `userId` de responsável dos chamados ainda em andamento (não resolvidos nem fechados), opcionalmente só de
+ * uma equipe. Usado quando o admin remove alguém da equipe, desativa ou rebaixa a solicitante: sem isso o ex-técnico
+ * continuaria com acesso pelo vínculo de responsável e o chamado ficaria preso a quem não atende mais.
+ */
+export async function releaseAssignments(
+  tx: Prisma.TransactionClient,
+  input: { actorId: string; userId: string; teamId?: string },
+): Promise<number> {
+  const where: Prisma.TicketWhereInput = {
+    assigneeId: input.userId,
+    status: { notIn: ["RESOLVED", "CLOSED"] },
+    ...(input.teamId ? { teamId: input.teamId } : {}),
+  };
+  const tickets = await tx.ticket.findMany({ where, select: { id: true } });
+  if (tickets.length === 0) return 0;
+  await tx.ticket.updateMany({ where: { id: { in: tickets.map((t) => t.id) } }, data: { assigneeId: null } });
+  await tx.ticketEvent.createMany({
+    data: tickets.map((t) => ({
+      ticketId: t.id,
+      actorId: input.actorId,
+      type: "ASSIGNED",
+      data: { before: { assigneeId: input.userId }, after: { assigneeId: null }, via: "admin" },
+    })),
+  });
+  return tickets.length;
 }

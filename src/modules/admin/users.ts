@@ -4,6 +4,7 @@ import { AppError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { escapeLike } from "@/lib/like";
 import { recordAudit } from "@/modules/audit";
 import { can, type Role, type SessionUser } from "@/modules/auth";
+import { releaseAssignments } from "@/modules/tickets";
 
 const MAX_PAGE_SIZE = 100;
 const LAST_ADMIN_MESSAGE = "É preciso manter ao menos um administrador ativo.";
@@ -51,6 +52,24 @@ async function loadTarget(tx: Prisma.TransactionClient, userId: string) {
   return target;
 }
 
+/** Convites ainda pendentes criados por quem deixa de ser admin ativo deixam de valer. */
+async function revokeInvitesCreatedBy(tx: Prisma.TransactionClient, userId: string) {
+  await tx.invite.updateMany({
+    where: { createdById: userId, usedAt: null, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+}
+
+/** Todos os técnicos ativos (sem teto de página), para os selects de membros de equipe. */
+export async function listActiveStaff(actor: SessionUser): Promise<{ id: string; name: string; email: string }[]> {
+  assertAdmin(actor);
+  return getDb().user.findMany({
+    where: { active: true, role: { in: ["AGENT", "TEAM_LEAD", "ADMIN"] } },
+    select: { id: true, name: true, email: true },
+    orderBy: { name: "asc" },
+  });
+}
+
 export async function listUsers(
   actor: SessionUser,
   query: { page: number; pageSize: number; q?: string },
@@ -85,6 +104,12 @@ export async function changeRole(actor: SessionUser, userId: string, role: Role)
     const removesAdmin = target.role === "ADMIN" && target.active && role !== "ADMIN";
     if (removesAdmin && admins.filter((id) => id !== userId).length === 0) throw new AppError(400, LAST_ADMIN_MESSAGE);
 
+    if (target.role === "ADMIN" && role !== "ADMIN") await revokeInvitesCreatedBy(tx, userId);
+    if (role === "REQUESTER") {
+      // Solicitante não atende chamados: sai de responsável e das equipes.
+      await releaseAssignments(tx, { actorId: actor.id, userId });
+      await tx.teamMember.deleteMany({ where: { userId } });
+    }
     const updated = await tx.user.update({ where: { id: userId }, data: { role }, include: userInclude });
     await recordAudit(tx, {
       actorId: actor.id,
@@ -109,7 +134,11 @@ export async function setActive(actor: SessionUser, userId: string, active: bool
     if (removesAdmin && admins.filter((id) => id !== userId).length === 0) throw new AppError(400, LAST_ADMIN_MESSAGE);
 
     const updated = await tx.user.update({ where: { id: userId }, data: { active }, include: userInclude });
-    if (!active) await tx.session.deleteMany({ where: { userId } });
+    if (!active) {
+      await tx.session.deleteMany({ where: { userId } });
+      await releaseAssignments(tx, { actorId: actor.id, userId });
+      await revokeInvitesCreatedBy(tx, userId);
+    }
     await recordAudit(tx, {
       actorId: actor.id,
       action: active ? "user.activate" : "user.deactivate",

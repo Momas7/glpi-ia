@@ -1,5 +1,6 @@
 export {
   changeRole,
+  listActiveStaff,
   listPendingInvites,
   listUsers,
   revokeInvite,

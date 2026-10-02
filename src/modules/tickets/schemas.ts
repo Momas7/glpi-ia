@@ -52,9 +52,10 @@ export type ListTicketsQuery = Partial<z.input<typeof listQuerySchema>> & { page
 export type PatchTicketInput = z.infer<typeof patchTicketSchema>;
 export type TicketStatus = z.infer<typeof statusEnum>;
 
+// Chamado nunca fica sem equipe pela atribuição (sumiria de todas as filas).
 export const assignTicketSchema = z
   .object({
-    teamId: z.string().min(1).nullable(),
+    teamId: z.string().min(1),
     assigneeId: z.string().min(1).nullable(),
   })
   .partial()

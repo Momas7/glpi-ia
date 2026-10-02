@@ -1,6 +1,8 @@
 import { InviteForm } from "@/components/admin/InviteForm";
 import { RevokeInviteButton, UserRowActions } from "@/components/admin/UserRowActions";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ROLE_LABEL, formatDateTime } from "@/lib/labels";
@@ -9,13 +11,18 @@ import { listPendingInvites, listUsers } from "@/modules/admin";
 
 export const metadata = { title: "Usuários · Administração" };
 
-export default async function UsersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+const PAGE_SIZE = 50;
+
+export default async function UsersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
   const user = await requireUser();
-  const { q } = await searchParams;
+  const { q, page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
   const [{ items, total }, invites] = await Promise.all([
-    listUsers(user, { page: 1, pageSize: 100, q: q || undefined }),
+    listUsers(user, { page, pageSize: PAGE_SIZE, q: q || undefined }),
     listPendingInvites(user),
   ]);
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pageHref = (p: number) => `/admin/usuarios?${new URLSearchParams({ ...(q ? { q } : {}), page: String(p) })}`;
 
   return (
     <div className="flex flex-col gap-8">
@@ -75,6 +82,23 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             ))}
           </TableBody>
         </Table>
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>
+            Página {page} de {pages}
+          </span>
+          <div className="flex gap-2">
+            {page > 1 && (
+              <Link href={pageHref(page - 1)} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Anterior
+              </Link>
+            )}
+            {page < pages && (
+              <Link href={pageHref(page + 1)} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Próxima
+              </Link>
+            )}
+          </div>
+        </div>
       </section>
     </div>
   );

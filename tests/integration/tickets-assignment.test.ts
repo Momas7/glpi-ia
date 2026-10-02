@@ -90,6 +90,13 @@ describe("assignTicket", () => {
     expect(moved.assigneeId).toBeNull();
   });
 
+  it("não permite deixar o chamado sem equipe (400)", async () => {
+    const t = await ticketInT1();
+    const res = await post("@/app/api/tickets/[id]/assign/route", cookie.Lead, t.id, { teamId: null });
+    expect(res.status).toBe(400);
+    expect((await db.ticket.findUniqueOrThrow({ where: { id: t.id } })).teamId).toBe(t1);
+  });
+
   it("técnico comum não atribui (403)", async () => {
     const t = await ticketInT1();
     await expect(svc.assignTicket(agentA, t.id, { assigneeId: agentB.id })).rejects.toMatchObject({ status: 403 });
@@ -112,10 +119,13 @@ describe("takeTicket", () => {
     expect([agentA.id, agentB.id]).toContain(final.assigneeId);
   });
 
-  it("chamado que já tem responsável → 403; técnico de outra equipe → 404", async () => {
+  it("assumir depois que outro já assumiu (página desatualizada) → 409 com a mensagem certa; outra equipe → 404", async () => {
     const t = await ticketInT1();
     await svc.takeTicket(agentA, t.id);
-    await expect(svc.takeTicket(agentB, t.id)).rejects.toMatchObject({ status: 403 });
+    await expect(svc.takeTicket(agentB, t.id)).rejects.toMatchObject({
+      status: 409,
+      message: "Este chamado já foi assumido por outra pessoa.",
+    });
     await expect(svc.takeTicket(agentOther, t.id)).rejects.toMatchObject({ status: 404 });
   });
 

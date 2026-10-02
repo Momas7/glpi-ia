@@ -28,6 +28,8 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.auditLog.deleteMany();
+  await db.ticketEvent.deleteMany();
+  await db.ticket.deleteMany();
   await db.session.deleteMany();
   await db.teamMember.deleteMany();
   await db.category.deleteMany();
@@ -119,5 +121,27 @@ describe("rotas", () => {
     const { category } = await cat.json();
     expect((await route("@/app/api/admin/categories/[id]/route", "PATCH", c, { id: category.id }, { defaultTeamId: null })).status).toBe(200);
     expect((await route("@/app/api/admin/teams/route", "POST", c, {}, { name: "" })).status).toBe(400);
+  });
+});
+
+describe("revisão: membro removido e categorias duplicadas", () => {
+  it("remover da equipe tira o usuário de responsável dos chamados abertos daquela equipe", async () => {
+    const t = await admin.createTeam(ana, "Infraestrutura");
+    const other = await admin.createTeam(ana, "Sistemas");
+    await admin.addMember(ana, t.id, caio.id);
+    await admin.addMember(ana, other.id, caio.id);
+    const mk = (teamId: string) =>
+      db.ticket.create({ data: { title: "t", description: "d", requesterId: duda.id, assigneeId: caio.id, teamId } });
+    const inT = await mk(t.id);
+    const inOther = await mk(other.id);
+    await admin.removeMember(ana, t.id, caio.id);
+    expect((await db.ticket.findUniqueOrThrow({ where: { id: inT.id } })).assigneeId).toBeNull();
+    expect((await db.ticket.findUniqueOrThrow({ where: { id: inOther.id } })).assigneeId).toBe(caio.id);
+  });
+
+  it("não aceita duas categorias raiz com o mesmo nome (sem diferenciar maiúsculas) → 409", async () => {
+    await admin.createCategory(ana, { name: "Rede" });
+    await expect(admin.createCategory(ana, { name: "Rede" })).rejects.toMatchObject({ status: 409 });
+    await expect(admin.createCategory(ana, { name: "rede" })).rejects.toMatchObject({ status: 409 });
   });
 });
