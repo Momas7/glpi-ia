@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAction } from "./useAction";
+import { useAction } from "@/components/useAction";
 
 type Person = { id: string; name: string; email: string };
 
