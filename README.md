@@ -6,6 +6,8 @@ Sistema de chamados no estilo GLPI com automações de IA: triagem automática, 
 
 ## Visão geral
 
+![Fluxo de atendimento](docs/media/ticket-flow.gif)
+
 - **Stack:** Next.js (App Router), PostgreSQL com pgvector, Prisma, pg-boss (sem Redis), Tailwind, shadcn/ui e componentes React Bits.
 - **IA:** camada `LLMProvider` trocável por variável de ambiente (Gemini em desenvolvimento, Claude em produção).
 - **Segurança:** dados sensíveis mascarados antes do LLM, log de auditoria de toda chamada de IA, a IA nunca fecha chamado sozinha.
@@ -30,14 +32,14 @@ npm run worker              # em outro terminal
 
 Stack completa em containers: `docker compose up --build` (exige `SESSION_SECRET` e `POSTGRES_PASSWORD` no `.env`). O Postgres só escuta em `127.0.0.1`. Atenção: o Postgres aplica `POSTGRES_PASSWORD` apenas na primeira criação do volume; para trocar a senha, recrie o volume (`docker compose down -v`, que apaga os dados).
 
-Testes: `npm test` (unitários) e `npm run test:integration` (precisa de Docker/Podman).
+Testes: `npm test` (unitários), `npm run test:integration` (precisa de Docker/Podman) e `npm run test:e2e` (Playwright; `npx playwright install chromium` na primeira vez). O GIF acima é gerado por `scripts/make-gif.sh`.
 
 ## Fases
 
 | Fase | Entrega | Status |
 |---|---|---|
 | 0 | Setup: Compose, Prisma, CI, tema | concluída |
-| 1 | Auth e CRUD de chamados | planejada |
+| 1 | Auth e CRUD de chamados | concluída |
 | 2 | SLA, equipes, e-mail e dashboard | planejada |
 | 3 | LLMProvider e triagem | planejada |
 | 4 | RAG e sugestão de resposta | planejada |

@@ -47,3 +47,9 @@ next-env.d.ts
 
 # prisma client gerado
 /src/generated
+
+# e2e
+/.next-e2e
+/.e2e-uploads
+/test-results
+/playwright-report
