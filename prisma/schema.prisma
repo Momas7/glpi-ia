@@ -167,6 +167,19 @@ model Ticket {
   apiKey      ApiKey?      @relation(fields: [apiKeyId], references: [id])
   externalRef String?
 
+  // SLA (minutos úteis; prazos sempre recalculados a partir da criação)
+  slaFirstResponseMinutes      Int?
+  slaResolutionMinutes         Int?
+  firstResponseDue             DateTime?
+  resolutionDue                DateTime?
+  firstRespondedAt             DateTime?
+  pausedAt                     DateTime?
+  pausedMinutes                Int       @default(0)
+  firstResponseBusinessMinutes Int?
+  resolutionBusinessMinutes    Int?
+  slaWarnedAt                  DateTime?
+  slaBreachedAt                DateTime?
+
   comments    Comment[]
   attachments Attachment[]
   events      TicketEvent[]
@@ -264,4 +277,26 @@ model WebhookDelivery {
   deliveredAt DateTime?
 
   @@index([status, createdAt])
+}
+
+/** Prazos por prioridade, em minutos úteis. */
+model SlaPolicy {
+  id                   String   @id @default(cuid())
+  priority             Priority @unique
+  firstResponseMinutes Int
+  resolutionMinutes    Int
+}
+
+/** Expediente por dia da semana (0 = domingo … 6 = sábado). Dia sem linha não tem expediente. */
+model BusinessHours {
+  id          String @id @default(cuid())
+  weekday     Int    @unique
+  startMinute Int
+  endMinute   Int
+}
+
+model Holiday {
+  id   String   @id @default(cuid())
+  date DateTime @unique @db.Date
+  name String
 }

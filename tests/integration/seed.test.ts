@@ -43,6 +43,26 @@ describe("seed fictício: usuários e chamados demo", () => {
   });
 });
 
+describe("seed: SLA", () => {
+  it("políticas, expediente e feriados, de forma idempotente", async () => {
+    await seed(db);
+    await seed(db);
+    const policies = await db.slaPolicy.findMany({ orderBy: { resolutionMinutes: "asc" } });
+    expect(policies.map((p) => [p.priority, p.firstResponseMinutes, p.resolutionMinutes])).toEqual([
+      ["CRITICAL", 60, 240],
+      ["HIGH", 120, 480],
+      ["MEDIUM", 240, 1440],
+      ["LOW", 480, 2400],
+    ]);
+    const hours = await db.businessHours.findMany({ orderBy: { weekday: "asc" } });
+    expect(hours.map((h) => [h.weekday, h.startMinute, h.endMinute])).toEqual([1, 2, 3, 4, 5].map((d) => [d, 480, 1080]));
+    const year = new Date().getFullYear();
+    const holidays = await db.holiday.findMany();
+    expect(holidays.length).toBe(39);
+    expect(holidays.some((h) => h.date.toISOString().startsWith(`${year}-12-25`))).toBe(true);
+  });
+});
+
 describe("seed fictício", () => {
   it("é idempotente: rodar duas vezes não duplica equipes nem categorias", async () => {
     await seed(db);
