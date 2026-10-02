@@ -33,6 +33,7 @@ export const ticketInclude = {
   assignee: { select: { id: true, name: true } },
   team: { select: { id: true, name: true } },
   category: { select: { id: true, name: true } },
+  apiKey: { select: { name: true } },
 } satisfies Prisma.TicketInclude;
 const include = ticketInclude;
 
