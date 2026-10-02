@@ -34,6 +34,17 @@ Stack completa em containers: `docker compose up --build` (exige `SESSION_SECRET
 
 Testes: `npm test` (unitários), `npm run test:integration` (precisa de Docker/Podman) e `npm run test:e2e` (Playwright; `npx playwright install chromium` na primeira vez). O GIF acima é gerado por `scripts/make-gif.sh`.
 
+## Primeiro administrador e produção
+
+O cadastro é só por convite, e convites exigem um administrador. Na primeira instalação crie o primeiro direto no banco (a senha vem de variável de ambiente e passa pela política de 12 caracteres):
+
+```bash
+read -rs ADMIN_PASSWORD && export ADMIN_PASSWORD
+npm run admin:create -- --email voce@empresa.com --name "Seu Nome"
+```
+
+Notas para o ambiente real: o `web` só escuta em `127.0.0.1:3000` e deve ficar atrás de um proxy com HTTPS (Caddy, na Fase 6); o cookie de sessão é `Secure`, então acessar por `http://servidor:3000` não mantém o login. `TRUSTED_PROXY_HOPS` diz quantos proxies seus existem na frente (padrão 1). Não use `SEED_DEMO_PASSWORD` em produção.
+
 ## Fases
 
 | Fase | Entrega | Status |

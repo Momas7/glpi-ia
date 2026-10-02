@@ -11,6 +11,11 @@ describe("configuração de deploy", () => {
     expect(compose).toMatch(/127\.0\.0\.1:5432:5432/);
   });
 
+  it("publica o web só em 127.0.0.1 (atrás de proxy), não em todas as interfaces", () => {
+    expect(compose).not.toMatch(/-\s*"3000:3000"/);
+    expect(compose).toMatch(/127\.0\.0\.1:3000:3000/);
+  });
+
   it("não traz a senha do banco fixa no repositório", () => {
     expect(compose).not.toMatch(/glpi:glpi@/);
     expect(compose).not.toMatch(/POSTGRES_PASSWORD:\s*glpi\b/);

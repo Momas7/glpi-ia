@@ -78,6 +78,29 @@ describe("can: ADMIN", () => {
   });
 });
 
+describe("can: técnico que é apenas o solicitante do chamado de outra equipe", () => {
+  const agent = user("AGENT"); // equipe t1
+  const lead = user("TEAM_LEAD");
+  const mineInOtherTeam = { requesterId: "u1", teamId: "t2", assigneeId: null };
+
+  it("lê e comenta como solicitante comum", () => {
+    expect(can(agent, "ticket:read", mineInOtherTeam)).toBe(true);
+    expect(can(agent, "comment:create", mineInOtherTeam)).toBe(true);
+  });
+
+  it("não lê notas internas, não edita, não fecha nem atribui", () => {
+    for (const a of ["comment:read_internal", "ticket:update", "ticket:close"] as Action[]) {
+      expect(can(agent, a, mineInOtherTeam), a).toBe(false);
+    }
+    expect(can(lead, "ticket:assign", mineInOtherTeam)).toBe(false);
+  });
+
+  it("mantém os direitos de técnico quando também é da equipe ou o responsável", () => {
+    expect(can(agent, "comment:read_internal", { requesterId: "u1", teamId: "t1", assigneeId: null })).toBe(true);
+    expect(can(agent, "ticket:update", { requesterId: "u1", teamId: "t2", assigneeId: "u1" })).toBe(true);
+  });
+});
+
 describe("can: sem recurso", () => {
   it("ações sobre chamado sem recurso são negadas (exceto criar e ADMIN)", () => {
     expect(can(user("AGENT"), "ticket:read")).toBe(false);

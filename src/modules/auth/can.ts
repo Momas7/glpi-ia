@@ -35,7 +35,7 @@ export function can(user: SessionUser, action: Action, resource?: TicketResource
     case "ticket:update":
     case "ticket:close":
     case "comment:read_internal":
-      return isStaff(user) && canAccessTicket(user, resource);
+      return isStaffFor(user, resource);
     case "ticket:assign":
       return user.role === "TEAM_LEAD" && inMyTeam(user, resource);
   }
@@ -43,6 +43,14 @@ export function can(user: SessionUser, action: Action, resource?: TicketResource
 
 function isStaff(user: SessionUser): boolean {
   return user.role === "AGENT" || user.role === "TEAM_LEAD";
+}
+
+/**
+ * Direitos de técnico valem pela relação com o chamado (equipe ou responsável), não só pelo papel:
+ * um técnico que apenas abriu um chamado para outra equipe é tratado como solicitante comum.
+ */
+function isStaffFor(user: SessionUser, resource?: TicketResource): boolean {
+  return isStaff(user) && (inMyTeam(user, resource) || (!!resource && resource.assigneeId === user.id));
 }
 
 function inMyTeam(user: SessionUser, resource?: TicketResource): boolean {

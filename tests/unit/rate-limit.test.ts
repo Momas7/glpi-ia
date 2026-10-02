@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkRateLimit } from "@/modules/auth/rate-limit";
+import { checkRateLimit, rateLimitKeyCount } from "@/modules/auth/rate-limit";
 
 describe("checkRateLimit", () => {
   it("permite até o limite dentro da janela e bloqueia o excedente", () => {
@@ -19,5 +19,13 @@ describe("checkRateLimit", () => {
     const t = 3_000_000;
     for (let i = 0; i < 3; i++) checkRateLimit("a", 3, 60, t);
     expect(checkRateLimit("b", 3, 60, t)).toBe(true);
+  });
+
+  it("poda chaves vencidas para o mapa não crescer sem limite", () => {
+    const t = 4_000_000;
+    for (let i = 0; i < 6000; i++) checkRateLimit(`flood:${i}`, 3, 60, t);
+    expect(rateLimitKeyCount()).toBeGreaterThanOrEqual(6000);
+    checkRateLimit("depois", 3, 60, t + 120_000);
+    expect(rateLimitKeyCount()).toBeLessThan(100);
   });
 });

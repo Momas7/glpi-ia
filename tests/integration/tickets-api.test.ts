@@ -178,6 +178,50 @@ describe("comentários", () => {
   });
 });
 
+describe("limite de corpo", () => {
+  const chunkedBody = (chunks: number, size: number) =>
+    new ReadableStream({
+      pull(c) {
+        if (chunks-- > 0) c.enqueue(new Uint8Array(size));
+        else c.close();
+      },
+    });
+
+  async function postChunked(mod: string, cookie: string | undefined, params: Record<string, string>, mb: number, type: string) {
+    const m = await import(mod);
+    const headers: Record<string, string> = { origin: ORIGIN, "x-forwarded-for": "6.6.6.6", "content-type": type };
+    if (cookie) headers.cookie = cookie;
+    const req = new Request(`${ORIGIN}/api/x`, {
+      method: "POST",
+      headers,
+      body: chunkedBody(mb, 1024 * 1024),
+      // @ts-expect-error duplex exigido pelo Node
+      duplex: "half",
+    });
+    expect(req.headers.get("content-length")).toBeNull();
+    return m.POST(req, ctx(params));
+  }
+
+  it("anexo em chunks sem content-length acima de 10 MB → 413 e nada é gravado", async () => {
+    const t = await newTicket();
+    const before = readdirSync(uploadDir).length;
+    const res = await postChunked(ATTACH, cookies.reqA, { id: t.id }, 13, "multipart/form-data; boundary=x");
+    expect(res.status).toBe(413);
+    expect(readdirSync(uploadDir).length).toBe(before);
+  });
+
+  it("anexo em chamado alheio responde 404 antes de ler o corpo", async () => {
+    const t = await newTicket();
+    const res = await postChunked(ATTACH, cookies.reqB, { id: t.id }, 13, "multipart/form-data; boundary=x");
+    expect(res.status).toBe(404);
+  });
+
+  it("login com JSON gigante em chunks → 413 sem precisar de sessão", async () => {
+    const res = await postChunked("@/app/api/auth/login/route", undefined, {}, 2, "application/json");
+    expect(res.status).toBe(413);
+  });
+});
+
 describe("anexos", () => {
   const upload = async (cookie: string, ticketId: string, name: string, content: Buffer, type = "application/octet-stream") => {
     const form = new FormData();

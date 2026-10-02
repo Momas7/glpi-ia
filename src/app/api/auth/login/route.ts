@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { clientIp } from "@/lib/http";
+import { clientIp, readJson, withErrors } from "@/lib/http";
 import { SESSION_COOKIE, SESSION_TTL_SECONDS, checkRateLimit, login } from "@/modules/auth";
 
 const bodySchema = z.object({
@@ -8,9 +8,9 @@ const bodySchema = z.object({
   password: z.string().min(1).max(256),
 });
 
-export async function POST(req: Request) {
+export const POST = withErrors(async (req: Request) => {
   const ip = clientIp(req);
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
+  const parsed = bodySchema.safeParse(await readJson(req));
   if (!parsed.success) {
     return NextResponse.json({ error: "Dados inválidos." }, { status: 400 });
   }
@@ -37,4 +37,4 @@ export async function POST(req: Request) {
     maxAge: SESSION_TTL_SECONDS,
   });
   return res;
-}
+});

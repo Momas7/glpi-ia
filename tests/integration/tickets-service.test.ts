@@ -116,6 +116,41 @@ describe("status", () => {
   });
 });
 
+describe("concorrência de status", () => {
+  it("duas mudanças simultâneas a partir de RESOLVED: uma vence, a outra recebe 409, e o estado final é válido", async () => {
+    const t = await createInT1("corrida");
+    await svc.changeStatus(agent1, t.id, "OPEN");
+    await svc.changeStatus(agent1, t.id, "RESOLVED");
+    const results = await Promise.allSettled([
+      svc.changeStatus(agent1, t.id, "CLOSED"),
+      svc.changeStatus(agent1, t.id, "OPEN"),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const lost = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    expect(lost.reason).toMatchObject({ status: 409 });
+    const final = await db.ticket.findUniqueOrThrow({ where: { id: t.id } });
+    expect(["CLOSED", "OPEN"]).toContain(final.status);
+    expect(final.status === "OPEN" ? final.closedAt : final.resolvedAt).not.toBeUndefined();
+    if (final.status === "OPEN") expect(final.closedAt).toBeNull();
+  });
+});
+
+describe("equipe de entrada padrão", () => {
+  it("chamado sem categoria nem equipe vai para a equipe de entrada (Suporte N1), ficando visível aos técnicos dela", async () => {
+    const intake = await db.team.create({ data: { name: "Suporte N1" } });
+    const intakeAgent = toSession(await db.user.create({ data: { name: "N1", email: "n1@x.com", role: "AGENT" } }), [intake.id]);
+    const t = await create(reqA, "sem categoria");
+    expect(t.teamId).toBe(intake.id);
+    expect(await svc.getTicket(intakeAgent, t.id)).not.toBeNull();
+  });
+
+  it("não sobrescreve a equipe vinda da categoria", async () => {
+    await db.team.create({ data: { name: "Suporte N1" } });
+    const cat = await db.category.create({ data: { name: "Rede", defaultTeamId: t1 } });
+    expect((await create(reqA, "com categoria", { categoryId: cat.id })).teamId).toBe(t1);
+  });
+});
+
 describe("visibilidade e permissões", () => {
   it("solicitante não vê chamado alheio em getTicket nem em listTickets", async () => {
     const t = await create(reqA, "da A");
