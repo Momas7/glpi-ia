@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/lib/db";
+import { AppError } from "@/lib/errors";
 import { can, type SessionUser } from "@/modules/auth";
 import type { CreateTicketInput, ListTicketsQuery, TicketStatus, UpdateTicketInput } from "./schemas";
 
@@ -7,19 +8,19 @@ const MAX_PAGE_SIZE = 100;
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 
-export class TicketNotFoundError extends Error {
+export class TicketNotFoundError extends AppError {
   constructor() {
-    super("Chamado não encontrado.");
+    super(404, "Chamado não encontrado.");
   }
 }
-export class ForbiddenError extends Error {
+export class ForbiddenError extends AppError {
   constructor(message = "Sem permissão para esta ação.") {
-    super(message);
+    super(403, message);
   }
 }
-export class InvalidTransitionError extends Error {
+export class InvalidTransitionError extends AppError {
   constructor(from: string, to: string) {
-    super(`Transição de status inválida: ${from} → ${to}.`);
+    super(409, `Transição de status inválida: ${from} → ${to}.`);
   }
 }
 
@@ -74,7 +75,8 @@ export async function createTicket(actor: SessionUser, input: CreateTicketInput)
   if (!can(actor, "ticket:create")) throw new ForbiddenError();
   const db = getDb();
   return db.$transaction(async (tx) => {
-    let teamId = input.teamId ?? null;
+    // Solicitante não escolhe a equipe: a triagem (humana ou da IA) decide.
+    let teamId = actor.role === "REQUESTER" ? null : (input.teamId ?? null);
     if (!teamId && input.categoryId) {
       const category = await tx.category.findUnique({ where: { id: input.categoryId } });
       teamId = category?.defaultTeamId ?? null;
