@@ -29,6 +29,21 @@ execSync("npx prisma db seed", { env, stdio: "inherit" });
 
 const app = spawn("npx", ["next", "dev", "-p", PORT], { env, stdio: "inherit" });
 
+// Aquece as rotas mais usadas (o dev server compila na primeira visita) para os testes não pagarem esse custo.
+(async () => {
+  for (let i = 0; i < 120; i++) {
+    try {
+      if ((await fetch(`http://localhost:${PORT}/api/health`)).ok) break;
+    } catch {
+      /* servidor ainda subindo */
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  for (const path of ["/login", "/api/auth/login", "/tickets", "/admin"]) {
+    await fetch(`http://localhost:${PORT}${path}`, { redirect: "manual", method: path.startsWith("/api") ? "POST" : "GET" }).catch(() => {});
+  }
+})();
+
 const shutdown = async () => {
   app.kill("SIGTERM");
   await container.stop().catch(() => {});

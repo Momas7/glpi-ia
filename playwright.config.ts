@@ -8,6 +8,10 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
+  // O servidor de teste é o `next dev`, que compila cada página na primeira visita: em máquinas lentas (CI) o
+  // login pode levar mais que os 5 s padrão.
+  expect: { timeout: 20_000 },
+  timeout: 120_000,
   reporter: [["list"]],
   use: {
     baseURL: `http://localhost:${PORT}`,
