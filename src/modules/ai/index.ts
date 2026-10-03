@@ -10,7 +10,10 @@ export { buildTriagePrompt, runTriage, triageOutputSchema } from "./triage";
 export { decideSuggestion, decisionSchema, type Decision } from "./decisions";
 export {
   getAiOverview,
+  dismissDuplicates,
+  duplicateTicketIds,
   getDraftView,
+  getDuplicatesView,
   getSummaryView,
   getPendingTriage,
   pendingTriageTicketIds,
@@ -18,6 +21,7 @@ export {
   setTeamAi,
   type AiOverview,
   type DraftView,
+  type DuplicatesView,
   type SummaryView,
   type PendingTriage,
 } from "./overview";

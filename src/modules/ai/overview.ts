@@ -2,10 +2,10 @@ import type { Priority } from "@/generated/prisma/client";
 import { getConfig, type Config } from "@/lib/config";
 import { enqueue } from "@/lib/queue";
 import { getDb } from "@/lib/db";
-import { ForbiddenError, NotFoundError } from "@/lib/errors";
+import { AppError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { recordAudit } from "@/modules/audit";
 import { can, type SessionUser } from "@/modules/auth";
-import type { TicketWithRefs } from "@/modules/tickets";
+import { TicketNotFoundError, getTicket, type TicketWithRefs } from "@/modules/tickets";
 import { stripCitations, teamAiEnabled, type DraftSourceRef } from "./draft";
 import { realComments } from "./summary";
 import { getEmbeddingProvider } from "./embedding/factory";
@@ -232,4 +232,60 @@ export async function getSummaryView(actor: SessionUser, ticket: TicketWithRefs,
     ? await db.comment.count({ where: { ticketId: ticket.id, ...realComments, createdAt: { gt: last.createdAt } } })
     : Math.max(0, commentCount - payload.commentCount);
   return { available, commentCount, summary: { text: payload.text, commentCount: payload.commentCount, newComments } };
+}
+
+export interface DuplicatesView {
+  id: string;
+  candidates: { id: string; number: number; title: string; status: string; similarity: number; canOpen: boolean }[];
+}
+
+interface DuplicatePayload {
+  candidates: { ticketId: string; number: number; title: string; similarity: number }[];
+}
+
+const OPEN_STATUS = ["NEW", "OPEN", "PENDING"];
+
+/** Os possíveis duplicados do chamado (sugestão pendente), só para quem o atende. Candidato encerrado ou apagado sai. */
+export async function getDuplicatesView(actor: SessionUser, ticket: TicketWithRefs): Promise<DuplicatesView | null> {
+  if (!can(actor, "ai:decide", ticket)) return null;
+  const db = getDb();
+  const s = await db.aiSuggestion.findFirst({ where: { ticketId: ticket.id, kind: "DUPLICATE", status: "PENDING" } });
+  if (!s) return null;
+  const payload = s.payload as unknown as DuplicatePayload;
+  const current = await db.ticket.findMany({
+    where: { id: { in: payload.candidates.map((c) => c.ticketId) } },
+    select: { id: true, number: true, title: true, status: true, requesterId: true, teamId: true, assigneeId: true },
+  });
+  const byId = new Map(current.map((t) => [t.id, t]));
+  const candidates = payload.candidates.flatMap((c) => {
+    const t = byId.get(c.ticketId);
+    if (!t || !OPEN_STATUS.includes(t.status)) return [];
+    return [{ id: t.id, number: t.number, title: t.title, status: t.status, similarity: c.similarity, canOpen: can(actor, "ticket:read", t as never) }];
+  });
+  return candidates.length === 0 ? null : { id: s.id, candidates };
+}
+
+/** Ids dos chamados da lista com possível duplicado pendente que o usuário pode decidir (uma consulta só). */
+export async function duplicateTicketIds(actor: SessionUser, tickets: TicketWithRefs[]): Promise<Set<string>> {
+  const decidable = tickets.filter((t) => can(actor, "ai:decide", t));
+  if (decidable.length === 0) return new Set();
+  const rows = await getDb().aiSuggestion.findMany({
+    where: { ticketId: { in: decidable.map((t) => t.id) }, kind: "DUPLICATE", status: "PENDING" },
+    select: { ticketId: true },
+  });
+  return new Set(rows.map((r) => r.ticketId));
+}
+
+/** "Não é duplicado": descarta a sugestão. Decisão única; nada é vinculado nem mesclado. */
+export async function dismissDuplicates(actor: SessionUser, ticketId: string): Promise<void> {
+  const ticket = await getTicket(actor, ticketId);
+  if (!ticket || !can(actor, "ai:decide", ticket)) throw new TicketNotFoundError();
+  const db = getDb();
+  const s = await db.aiSuggestion.findUnique({ where: { ticketId_kind: { ticketId, kind: "DUPLICATE" } } });
+  if (!s) throw new AppError(404, "Sugestão não encontrada.");
+  const claimed = await db.aiSuggestion.updateMany({
+    where: { id: s.id, status: "PENDING" },
+    data: { status: "REJECTED", decidedById: actor.id, decidedAt: new Date() },
+  });
+  if (claimed.count !== 1) throw new AppError(409, "Esta sugestão já foi decidida.");
 }
