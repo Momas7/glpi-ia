@@ -126,7 +126,7 @@ async function requireCategory(tx: Tx, categoryId: string) {
 }
 
 /** Aplica campos editáveis dentro de uma transação já aberta. */
-async function applyFields(tx: Tx, actor: SessionUser, current: TicketWithRefs, patch: UpdateTicketInput): Promise<void> {
+export async function applyFields(tx: Tx, actor: SessionUser, current: TicketWithRefs, patch: UpdateTicketInput): Promise<void> {
   if (!can(actor, "ticket:update", current)) throw new ForbiddenError();
   if (patch.categoryId) await requireCategory(tx, patch.categoryId);
 

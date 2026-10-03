@@ -37,3 +37,4 @@ export {
 export { assignTicket, listAssignmentOptions, releaseAssignments, takeTicket } from "./assignment";
 export { autoCloseResolved, confirmTicket, reopenSchema, reopenTicket } from "./resolution";
 export { addCommentFromApi, createTicketFromApi } from "./inbound";
+export { applyTriageFields, type TriageFields } from "./triage-apply";
