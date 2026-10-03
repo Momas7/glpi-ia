@@ -18,7 +18,9 @@ export type Action =
   | "ticket:confirm"
   | "admin:manage"
   | "dashboard:view"
-  | "ai:decide";
+  | "ai:decide"
+  | "kb:read"
+  | "kb:manage";
 
 export interface TicketResource {
   requesterId?: string;
@@ -42,6 +44,10 @@ export function can(user: SessionUser, action: Action, resource?: TicketResource
     case "user:manage":
     case "admin:manage":
       return false;
+    case "kb:read":
+      return isStaff(user);
+    case "kb:manage":
+      return user.role === "TEAM_LEAD";
     case "dashboard:view":
       return user.role === "TEAM_LEAD";
     case "ticket:take":

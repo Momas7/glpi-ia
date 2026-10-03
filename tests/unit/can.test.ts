@@ -163,3 +163,16 @@ describe("can: ai:decide", () => {
     expect(can(user("AGENT"), "ai:decide")).toBe(false);
   });
 });
+
+describe("can: base de conhecimento", () => {
+  it("kb:read vale para equipe e admin, nunca para solicitante", () => {
+    for (const role of ["AGENT", "TEAM_LEAD", "ADMIN"] as Role[]) expect(can(user(role), "kb:read"), role).toBe(true);
+    expect(can(user("REQUESTER"), "kb:read")).toBe(false);
+  });
+  it("kb:manage vale para líder e admin, não para técnico nem solicitante", () => {
+    expect(can(user("TEAM_LEAD"), "kb:manage")).toBe(true);
+    expect(can(user("ADMIN"), "kb:manage")).toBe(true);
+    expect(can(user("AGENT"), "kb:manage")).toBe(false);
+    expect(can(user("REQUESTER"), "kb:manage")).toBe(false);
+  });
+});

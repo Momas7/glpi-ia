@@ -21,12 +21,17 @@ export type AuditAction =
   | "ai.suggestion_accept"
   | "ai.suggestion_edit"
   | "ai.suggestion_reject"
-  | "team.ai_toggle";
+  | "team.ai_toggle"
+  | "kb.create"
+  | "kb.update"
+  | "kb.publish"
+  | "kb.unpublish"
+  | "kb.delete";
 
 export interface AuditEntry {
   actorId: string;
   action: AuditAction;
-  targetType: "user" | "invite" | "team" | "category" | "apikey" | "sla" | "ticket";
+  targetType: "user" | "invite" | "team" | "category" | "apikey" | "sla" | "ticket" | "kb";
   targetId: string;
   data?: Record<string, unknown>;
 }
