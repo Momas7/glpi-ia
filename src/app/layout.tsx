@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chamados IA",
+  title: "Sistema de Chamados",
   description: "Sistema de chamados com IA (estilo GLPI)",
 };
 

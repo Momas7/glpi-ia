@@ -13,7 +13,7 @@ import { can } from "@/modules/auth";
 import { loadCalendar, slaState } from "@/modules/sla";
 import { TRANSITIONS, getComments, getTicket, listAssignmentOptions, listAttachments } from "@/modules/tickets";
 
-export const metadata = { title: "Chamado · Chamados IA" };
+export const metadata = { title: "Chamado · Sistema de Chamados" };
 
 export default async function TicketPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();

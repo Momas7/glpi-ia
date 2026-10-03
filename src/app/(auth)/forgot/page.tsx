@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { JsonForm } from "@/components/forms/JsonForm";
 
-export const metadata = { title: "Recuperar senha · Chamados IA" };
+export const metadata = { title: "Recuperar senha · Sistema de Chamados" };
 
 export default function ForgotPage() {
   return (
