@@ -1,0 +1,9 @@
+[Unit]
+Description=Teste de restauração semanal, aos domingos às 3h30
+
+[Timer]
+OnCalendar=Sun *-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
