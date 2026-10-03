@@ -34,11 +34,38 @@ describe("seed fictício: usuários e chamados demo", () => {
       ["solicitante@demo.test", "REQUESTER"],
     ]);
     expect(users.every((u) => u.passwordHash?.startsWith("$argon2id$"))).toBe(true);
-    const tickets = await db.ticket.count();
+    const tickets = await db.ticket.count({ where: { NOT: { title: { startsWith: "Histórico " } } } });
     expect(tickets).toBeGreaterThanOrEqual(25);
     expect(tickets).toBeLessThanOrEqual(35);
     const agent = users.find((u) => u.role === "AGENT")!;
     expect(await db.teamMember.count({ where: { userId: agent.id } })).toBeGreaterThan(0);
+    delete process.env.SEED_DEMO_PASSWORD;
+  });
+});
+
+describe("seed fictício: histórico de 6 meses para o dashboard", () => {
+  it("cria ~180 chamados resolvidos espalhados em 6 meses, coerentes e idempotentes", async () => {
+    process.env.SEED_DEMO_PASSWORD = "Demo-Fict1cia-Senha";
+    await seed(db);
+    const history = async () => db.ticket.findMany({ where: { title: { startsWith: "Histórico " } } });
+    const first = await history();
+    expect(first.length).toBeGreaterThanOrEqual(150);
+    expect(first.length).toBeLessThanOrEqual(220);
+
+    const months = new Set(first.map((t) => t.createdAt.toISOString().slice(0, 7)));
+    expect(months.size).toBeGreaterThanOrEqual(6);
+
+    expect(first.every((t) => t.status === "RESOLVED" || t.status === "CLOSED")).toBe(true);
+    expect(first.every((t) => t.resolvedAt && t.resolvedAt >= t.createdAt)).toBe(true);
+    expect(first.every((t) => t.resolutionDue && t.firstRespondedAt && t.resolutionBusinessMinutes && t.firstResponseBusinessMinutes)).toBe(true);
+    expect(first.every((t) => t.firstRespondedAt! <= t.resolvedAt!)).toBe(true);
+
+    const inTime = first.filter((t) => t.resolvedAt! <= t.resolutionDue!).length / first.length;
+    expect(inTime).toBeGreaterThanOrEqual(0.7);
+    expect(inTime).toBeLessThanOrEqual(0.9);
+
+    await seed(db);
+    expect((await history()).length).toBe(first.length);
     delete process.env.SEED_DEMO_PASSWORD;
   });
 });

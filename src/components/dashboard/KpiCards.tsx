@@ -39,7 +39,7 @@ const timeText = (minutes: number | null) => (minutes === null ? "—" : formatB
 export function KpiCards({ kpis }: { kpis: KpiData }) {
   const animate = !usePrefersReducedMotion();
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6">
       <Card title="Abertos agora" hint={`${kpis.openUnassigned} sem responsável`}>
         <Number_ value={kpis.openNow} animate={animate} />
       </Card>
@@ -57,10 +57,10 @@ export function KpiCards({ kpis }: { kpis: KpiData }) {
         )}
       </Card>
       <Card title="1ª resposta (média)" hint="horas úteis">
-        <span className="text-2xl font-semibold">{timeText(kpis.avgFirstResponseMinutes)}</span>
+        <span className="text-xl font-semibold leading-tight">{timeText(kpis.avgFirstResponseMinutes)}</span>
       </Card>
       <Card title="Resolução (média)" hint="horas úteis">
-        <span className="text-2xl font-semibold">{timeText(kpis.avgResolutionMinutes)}</span>
+        <span className="text-xl font-semibold leading-tight">{timeText(kpis.avgResolutionMinutes)}</span>
       </Card>
     </div>
   );

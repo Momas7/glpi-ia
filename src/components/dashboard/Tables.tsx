@@ -5,9 +5,9 @@ import type { DueSoonRow, WorkloadRow } from "@/modules/dashboard/queries";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-white/10 p-4">
+    <section className="flex min-w-0 flex-col gap-2 rounded-lg border border-white/10 p-4">
       <h3 className="text-sm font-medium">{title}</h3>
-      {children}
+      <div className="overflow-x-auto">{children}</div>
     </section>
   );
 }
@@ -21,25 +21,25 @@ export function DueSoonTable({ rows }: { rows: DueSoonRow[] }) {
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-muted-foreground">
             <tr>
-              <th className="w-14 py-1">#</th>
-              <th>Chamado</th>
-              <th>Responsável</th>
-              <th>Prazo</th>
+              <th className="w-12 whitespace-nowrap py-1 pr-2">#</th>
+              <th className="pr-3">Chamado</th>
+              <th className="pr-3">Responsável</th>
+              <th className="pr-3">Prazo</th>
               <th />
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-t border-white/5">
-                <td className="py-1.5 text-muted-foreground">#{r.number}</td>
-                <td>
+                <td className="whitespace-nowrap py-1.5 pr-2 text-muted-foreground">#{r.number}</td>
+                <td className="pr-3">
                   <Link href={`/tickets/${r.id}`} className="hover:underline">
                     {r.title}
                   </Link>
                   {r.team && <span className="ml-2 text-xs text-muted-foreground">{r.team}</span>}
                 </td>
-                <td>{r.assignee ?? <span className="text-muted-foreground">Sem responsável</span>}</td>
-                <td className="text-muted-foreground">{formatDateTime(r.resolutionDue)}</td>
+                <td className="pr-3">{r.assignee ?? <span className="text-muted-foreground">Sem responsável</span>}</td>
+                <td className="whitespace-nowrap pr-3 text-muted-foreground">{formatDateTime(r.resolutionDue)}</td>
                 <td>
                   <Badge variant="outline" className={`border-0 ${r.breached ? "bg-red-500/20 text-red-300" : "bg-amber-500/20 text-amber-300"}`}>
                     {r.breached ? "Vencido" : "Em risco"}

@@ -61,11 +61,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <DashboardFilters teams={teams} selectedTeamId={team} period={data.period} />
       </div>
       <KpiCards kpis={data.kpis} />
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2">
         <DueSoonTable rows={data.dueSoon} />
         <WorkloadTable rows={data.workload} />
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2">
         <WeeklyChart data={data.weekly} />
         <CategoryChart data={data.byCategory} />
         <TeamSlaChart data={data.slaByTeam} />
