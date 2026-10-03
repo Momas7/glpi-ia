@@ -58,4 +58,6 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - run: npm audit --audit-level=high
+      # Só dependências de produção: o `braces` (via ferramentas de desenvolvimento: CLI do shadcn e ESLint do Next)
+      # tem um aviso alto sem versão corrigida publicada e nunca roda em produção.
+      - run: npm audit --omit=dev --audit-level=high
