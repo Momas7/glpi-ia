@@ -23,6 +23,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <Link href="/admin/ia" className="text-muted-foreground hover:text-foreground">
           IA
         </Link>
+        <Link href="/admin/saude" className="text-muted-foreground hover:text-foreground">
+          Saúde
+        </Link>
       </div>
       {children}
     </div>

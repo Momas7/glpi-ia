@@ -3,6 +3,7 @@ import { z } from "zod";
 import { readBodyLimited } from "@/lib/body";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
+import { instrument } from "@/lib/request-log";
 import { can, checkRateLimit, getRequestUser, type SessionUser } from "@/modules/auth";
 import { authenticateApiKey, type ApiScope } from "@/modules/integrations";
 
@@ -45,7 +46,7 @@ export interface AuthedContext<P> {
 
 /** Autentica pela sessão, valida Origin e converte erros de domínio e de validação em respostas HTTP. */
 export function withAuth<P = Record<string, never>>(handler: (ctx: AuthedContext<P>) => Promise<Response>) {
-  return async (req: Request, routeCtx?: { params: Promise<P> }): Promise<Response> => {
+  return (req: Request, routeCtx?: { params: Promise<P> }): Promise<Response> => instrument(req, async () => {
     try {
       const user = await getRequestUser(req);
       if (!user) return jsonError(401, "Não autenticado.");
@@ -55,7 +56,7 @@ export function withAuth<P = Record<string, never>>(handler: (ctx: AuthedContext
     } catch (err) {
       return errorResponse(err);
     }
-  };
+  });
 }
 
 const MAX_JSON_BYTES = 64 * 1024;
@@ -83,13 +84,14 @@ export async function readOptionalJson(req: Request): Promise<unknown> {
 
 /** Para rotas públicas (sem sessão): converte erros de domínio e de validação em respostas HTTP. */
 export function withErrors(handler: (req: Request) => Promise<Response>) {
-  return async (req: Request): Promise<Response> => {
-    try {
-      return await handler(req);
-    } catch (err) {
-      return errorResponse(err);
-    }
-  };
+  return (req: Request): Promise<Response> =>
+    instrument(req, async () => {
+      try {
+        return await handler(req);
+      } catch (err) {
+        return errorResponse(err);
+      }
+    });
 }
 
 /** Rotas /api/admin: além de autenticar, exige admin:manage antes de ler o corpo (403 vem antes de 400). */
@@ -108,7 +110,7 @@ export interface ApiKeyContext<P> {
 
 /** Rotas /api/v1 (integrações): chave de API com escopo, 60 requisições/min por chave, erros em JSON. */
 export function withApiKey<P = Record<string, never>>(scope: ApiScope, handler: (ctx: ApiKeyContext<P>) => Promise<Response>) {
-  return async (req: Request, routeCtx?: { params: Promise<P> }): Promise<Response> => {
+  return (req: Request, routeCtx?: { params: Promise<P> }): Promise<Response> => instrument(req, async () => {
     try {
       const apiKey = await authenticateApiKey(req.headers.get("authorization"), scope);
       if (!checkRateLimit(`apikey:${apiKey.id}`, 60, 60)) return jsonError(429, "Limite de requisições excedido.");
@@ -117,5 +119,5 @@ export function withApiKey<P = Record<string, never>>(scope: ApiScope, handler: 
     } catch (err) {
       return errorResponse(err);
     }
-  };
+  });
 }
