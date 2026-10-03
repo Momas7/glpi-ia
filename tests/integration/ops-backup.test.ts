@@ -13,7 +13,7 @@ let name: string;
 let backupDir: string;
 let uploadsDir: string;
 
-const RUNTIME = "podman";
+const RUNTIME = process.env.RUNTIME ?? (spawnSync("podman", ["--version"]).status === 0 ? "podman" : "docker");
 
 beforeAll(async () => {
   container = await new PostgreSqlContainer("docker.io/pgvector/pgvector:pg16").start();
