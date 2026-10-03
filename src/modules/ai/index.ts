@@ -41,3 +41,4 @@ export {
 } from "./draft";
 export { AI_DETECT_QUEUE } from "./enqueue";
 export { detectForTicket, findDuplicates, type DetectConfig, type DetectDeps, type DuplicateCandidate } from "./detect";
+export { closeFinishedIncidents, closeIncident, detectIncident, getIncidentNotice, getOpenIncidentBanner, listIncidents, type IncidentRow } from "./incidents";

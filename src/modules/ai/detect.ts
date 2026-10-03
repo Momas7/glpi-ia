@@ -1,18 +1,10 @@
-import { getConfig } from "@/lib/config";
 import type { Prisma } from "@/generated/prisma/client";
-import { getDb, type Db } from "@/lib/db";
-import { runEmbed, type EmbedDeps } from "./embedding/run";
+import { dbOf, nowOf, resolveDetectConfig, vectorLiteralOf, type DetectDeps } from "./detect-shared";
+import { runEmbed } from "./embedding/run";
+import { closeFinishedIncidents, detectIncident } from "./incidents";
 import { signed, toVectorLiteral } from "./indexing";
 
-export interface DetectConfig {
-  duplicateMinSimilarity: number;
-  duplicateWindowHours: number;
-  incidentMinSimilarity: number;
-  incidentWindowMinutes: number;
-  incidentMinTickets: number;
-}
-
-export type DetectDeps = Partial<EmbedDeps> & { config?: DetectConfig };
+export type { DetectConfig, DetectDeps } from "./detect-shared";
 
 export interface DuplicateCandidate {
   ticketId: string;
@@ -25,27 +17,6 @@ const OPEN_STATUSES = ["NEW", "OPEN", "PENDING"];
 const MAX_CANDIDATES = 3;
 const POOL = 10;
 const DESCRIPTION_LIMIT = 4000;
-
-export function resolveDetectConfig(deps: DetectDeps): DetectConfig {
-  if (deps.config) return deps.config;
-  const c = getConfig();
-  return {
-    duplicateMinSimilarity: c.AI_DUPLICATE_MIN_SIMILARITY,
-    duplicateWindowHours: c.AI_DUPLICATE_WINDOW_HOURS,
-    incidentMinSimilarity: c.AI_INCIDENT_MIN_SIMILARITY,
-    incidentWindowMinutes: c.AI_INCIDENT_WINDOW_MINUTES,
-    incidentMinTickets: c.AI_INCIDENT_MIN_TICKETS,
-  };
-}
-
-export const dbOf = (deps: DetectDeps): Db => deps.db ?? getDb();
-export const nowOf = (deps: DetectDeps): Date => (deps.now ?? (() => new Date()))();
-
-/** O vetor de um chamado aberto, no formato que o pgvector aceita como parâmetro; `null` se não existir. */
-export async function vectorLiteralOf(db: Db, ticketId: string): Promise<string | null> {
-  const rows = await db.$queryRaw<{ v: string }[]>`SELECT "embedding"::text AS v FROM "OpenTicketVector" WHERE "ticketId" = ${ticketId}`;
-  return rows[0]?.v ?? null;
-}
 
 /**
  * Chamados abertos da MESMA equipe, das últimas horas da janela, parecidos com o chamado (nunca ele mesmo).
@@ -76,11 +47,6 @@ export async function findDuplicates(ticketId: string, deps: DetectDeps = {}): P
     .slice(0, MAX_CANDIDATES);
 }
 
-/** Gancho da detecção de incidente (ligado na Task 4). */
-export async function afterVectorStored(_ticketId: string, _deps: DetectDeps): Promise<void> {}
-/** Gancho chamado quando um chamado sai do índice de abertos (ligado na Task 4). */
-export async function afterVectorRemoved(_ticketId: string, _deps: DetectDeps): Promise<void> {}
-
 /**
  * Mantém o vetor do chamado aberto e, a partir dele, sugere duplicados e detecta incidente.
  * Chamado encerrado ou de equipe com IA desligada sai do índice. Falha do provider propaga (o pg-boss repete);
@@ -93,7 +59,7 @@ export async function detectForTicket(ticketId: string, deps: DetectDeps = {}): 
 
   const remove = async (): Promise<"removed"> => {
     await db.$executeRaw`DELETE FROM "OpenTicketVector" WHERE "ticketId" = ${ticketId}`;
-    await afterVectorRemoved(ticketId, deps);
+    await closeFinishedIncidents(dbOf(deps));
     return "removed";
   };
   if (!OPEN_STATUSES.includes(ticket.status)) return remove();
@@ -125,7 +91,7 @@ export async function detectForTicket(ticketId: string, deps: DetectDeps = {}): 
     }
   }
 
-  await afterVectorStored(ticketId, deps);
+  await detectIncident(ticketId, deps);
   return "detected";
 }
 

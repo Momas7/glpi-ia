@@ -59,7 +59,7 @@ describe("guia de integração com o n8n", () => {
   });
 
   it("o guia documenta todos os eventos e os erros da API", () => {
-    for (const ev of ["ticket.created", "ticket.assigned", "ticket.status_changed", "comment.created", "sla.warning", "sla.breached", "auth.invite_created", "auth.password_reset_requested"]) {
+    for (const ev of ["ticket.created", "ticket.assigned", "ticket.status_changed", "comment.created", "sla.warning", "sla.breached", "incident.detected", "auth.invite_created", "auth.password_reset_requested"]) {
       expect(doc, ev).toContain(`\`${ev}\``);
     }
     for (const code of ["401", "403", "413", "422", "429"]) expect(doc, code).toContain(code);
