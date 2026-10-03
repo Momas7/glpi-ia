@@ -10,5 +10,5 @@ describe("boot do worker", () => {
     });
     expect(r.status).toBe(1);
     expect(`${r.stdout}${r.stderr}`).toMatch(/DATABASE_URL/);
-  });
+  }, 30_000); // sobe o tsx num processo filho: em máquina ocupada passa dos 5 s padrão
 });
