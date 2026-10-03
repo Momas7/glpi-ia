@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { AiSuggestionCard } from "@/components/AiSuggestionCard";
 import { AttachmentForm } from "@/components/forms/AttachmentForm";
 import { CommentForm } from "@/components/forms/CommentForm";
 import { StatusControl } from "@/components/forms/StatusControl";
@@ -9,6 +10,7 @@ import { PriorityBadge, StatusBadge } from "@/components/StatusBadges";
 import { Badge } from "@/components/ui/badge";
 import { TYPE_LABEL, formatDateTime } from "@/lib/labels";
 import { requireUser } from "@/lib/server-session";
+import { getPendingTriage } from "@/modules/ai";
 import { can } from "@/modules/auth";
 import { loadCalendar, slaState } from "@/modules/sla";
 import { TRANSITIONS, getComments, getTicket, listAssignmentOptions, listAttachments } from "@/modules/tickets";
@@ -21,7 +23,11 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
   const ticket = await getTicket(user, id);
   if (!ticket) notFound();
 
-  const [comments, attachments] = await Promise.all([getComments(user, id), listAttachments(user, id)]);
+  const [comments, attachments, aiSuggestion] = await Promise.all([
+    getComments(user, id),
+    listAttachments(user, id),
+    getPendingTriage(user, ticket),
+  ]);
   const sla = slaState(ticket, new Date(), await loadCalendar());
   const canChange = can(user, "ticket:update", ticket);
   const canAssign = can(user, "ticket:assign", ticket);
@@ -42,6 +48,8 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
           <SlaBadge {...sla} />
         </div>
       </div>
+
+      {aiSuggestion && <AiSuggestionCard ticketId={ticket.id} suggestion={aiSuggestion} />}
 
       <StatusControl ticketId={ticket.id} next={next} />
 
