@@ -14,12 +14,13 @@ describe("menu lateral", () => {
     expect(labels("AGENT")).toEqual(["Chamados", "Novo chamado"]);
   });
 
-  it("gestor de equipe vê os mesmos itens (o Dashboard entra com o bloco 4)", () => {
-    expect(labels("TEAM_LEAD")).toEqual(["Chamados", "Novo chamado"]);
+  it("gestor de equipe também vê o Dashboard", () => {
+    expect(labels("TEAM_LEAD")).toEqual(["Chamados", "Novo chamado", "Dashboard"]);
+    expect(buildNavItems(user("TEAM_LEAD")).at(-1)?.href).toBe("/dashboard");
   });
 
-  it("admin também vê Administração, apontando para /admin", () => {
-    expect(labels("ADMIN")).toEqual(["Chamados", "Novo chamado", "Administração"]);
+  it("admin vê Dashboard e Administração, apontando para /admin", () => {
+    expect(labels("ADMIN")).toEqual(["Chamados", "Novo chamado", "Dashboard", "Administração"]);
     expect(buildNavItems(user("ADMIN")).at(-1)?.href).toBe("/admin");
   });
 });
