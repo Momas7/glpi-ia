@@ -13,7 +13,7 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "worker": "SERVICE_NAME=worker tsx --tsconfig tsconfig.json src/worker/index.ts",
+    "worker": "SERVICE_NAME=worker tsx --env-file-if-exists=.env --tsconfig tsconfig.json src/worker/index.ts",
     "test:e2e": "playwright test",
     "admin:create": "tsx --env-file-if-exists=.env scripts/create-admin.mts"
   },
