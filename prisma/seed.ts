@@ -14,6 +14,34 @@ const ROOT_CATEGORIES: { name: string; team: (typeof TEAMS)[number] }[] = [
   { name: "Acessos", team: "Suporte N1" },
 ];
 
+// Soluções fictícias por categoria: o RAG da demonstração precisa de texto de resolução com cara de verdade.
+const SEED_SOLUTIONS: Record<string, string[]> = {
+  Hardware: [
+    "Troquei o equipamento defeituoso por um do estoque e registrei o patrimônio novo.",
+    "Limpei os contatos e reiniciei o serviço de impressão; a fila voltou a andar.",
+    "Atualizei o driver do dispositivo e testei com o usuário no local.",
+  ],
+  Software: [
+    "Reinstalei o aplicativo com a versão homologada e reaplicamos a licença do usuário.",
+    "Limpei o cache e atualizei o programa para a última versão estável.",
+    "Corrigi a configuração da conta de e-mail no perfil e conferi a sincronização.",
+  ],
+  Rede: [
+    "Reiniciei o ponto de acesso do andar e conferi o sinal; a conexão estabilizou.",
+    "Troquei o cabo de rede e reconfigurei a porta do switch para a VLAN correta.",
+    "Renovei o endereço IP da estação e ajustei o DNS; a navegação voltou ao normal.",
+  ],
+  Acessos: [
+    "Redefini a senha, confirmei a identidade do solicitante e liberei o acesso solicitado.",
+    "Desbloqueei a conta no diretório e orientei sobre a troca de senha a cada 90 dias.",
+    "Adicionei o usuário ao grupo de permissão da pasta compartilhada, com aprovação do gestor.",
+  ],
+};
+const solutionFor = (category: string | undefined, n: number): string => {
+  const list = SEED_SOLUTIONS[category ?? ""] ?? SEED_SOLUTIONS.Software;
+  return list[n % list.length];
+};
+
 /** Idempotente. Raízes usam findFirst porque NULL em parentId não é único no Postgres. */
 export async function seed(db: Db): Promise<void> {
   const teamIds = new Map<string, string>();
@@ -136,6 +164,7 @@ async function seedHistory(db: Db, people: { agentId: string; requesterId: strin
           assigneeId: people.agentId,
           categoryId: category?.id,
           teamId: category?.defaultTeamId,
+          resolution: solutionFor(category?.name, i),
           createdAt,
         },
       });
@@ -200,6 +229,7 @@ async function seedDemo(db: Db, teamIds: Map<string, string>): Promise<void> {
         assigneeId: status === "NEW" ? null : agent.id,
         resolvedAt: status === "RESOLVED" || status === "CLOSED" ? new Date() : null,
         closedAt: status === "CLOSED" ? new Date() : null,
+        resolution: status === "RESOLVED" || status === "CLOSED" ? solutionFor(categoryName, index) : null,
         pausedAt: status === "PENDING" ? new Date(createdAt.getTime() + HOUR) : null,
       },
     });

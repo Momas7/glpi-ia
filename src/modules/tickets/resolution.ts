@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { can, type SessionUser } from "@/modules/auth";
+import { enqueueIndexTicket } from "@/modules/ai/enqueue";
 import { emitCommentEvent, emitTicketEvent } from "@/modules/integrations";
 import { slaOnStatusChange } from "@/modules/sla";
 import { loadVisible, ticketInclude, type TicketWithRefs } from "./service";
@@ -38,6 +39,7 @@ export async function reopenTicket(actor: SessionUser, id: string, reason: strin
     await slaOnStatusChange(tx, id, "RESOLVED", "OPEN", new Date());
     await emitTicketEvent(tx, "ticket.status_changed", id, { from: "RESOLVED", to: "OPEN" });
     await emitCommentEvent(tx, id, comment.id, { name: actor.name, email: actor.email });
+    await enqueueIndexTicket(tx, id); // reaberto sai da base de conhecimento
     return tx.ticket.findUniqueOrThrow({ where: { id }, include: ticketInclude });
   });
 }

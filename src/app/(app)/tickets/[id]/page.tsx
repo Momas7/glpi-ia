@@ -65,6 +65,12 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
 
       <div className="grid gap-6 lg:grid-cols-[1fr_16rem]">
         <div className="flex flex-col gap-6">
+          {ticket.resolution && (
+            <section aria-label="Solução" className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-4">
+              <h2 className="mb-2 font-medium">Solução</h2>
+              <SafeText value={ticket.resolution} className="prose-sm space-y-2" />
+            </section>
+          )}
           <section className="rounded-lg border border-white/10 p-4">
             <SafeText value={ticket.description} className="prose-sm space-y-2" />
           </section>

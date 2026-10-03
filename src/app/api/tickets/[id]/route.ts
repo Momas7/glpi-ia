@@ -11,7 +11,7 @@ export const GET = withAuth<Params>(async ({ user, params }) => {
 });
 
 export const PATCH = withAuth<Params>(async ({ req, user, params }) => {
-  const { status, ...fields } = patchTicketSchema.parse(await readJson(req));
-  const ticket = await patchTicket(user, params.id, { fields, status });
+  const { status, resolution, ...fields } = patchTicketSchema.parse(await readJson(req));
+  const ticket = await patchTicket(user, params.id, { fields, status, resolution });
   return NextResponse.json({ ticket });
 });

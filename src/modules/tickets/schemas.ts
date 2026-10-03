@@ -28,9 +28,12 @@ export const updateTicketSchema = z
   .partial()
   .refine((v) => Object.keys(v).length > 0, "Nada para atualizar.");
 
-/** Corpo do PATCH: campos editáveis e/ou mudança de status. */
+/** Solução escrita ao marcar como Resolvido: alimenta a base de conhecimento. */
+export const resolutionTextSchema = z.string().trim().min(10).max(4000);
+
+/** Corpo do PATCH: campos editáveis, mudança de status e, ao resolver, a solução. */
 export const patchTicketSchema = z
-  .object({ ...updatableFields, status: statusEnum })
+  .object({ ...updatableFields, status: statusEnum, resolution: resolutionTextSchema })
   .strict()
   .partial()
   .refine((v) => Object.keys(v).length > 0, "Nada para atualizar.");

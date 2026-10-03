@@ -56,6 +56,7 @@ describe("seed fictício: histórico de 6 meses para o dashboard", () => {
     expect(months.size).toBeGreaterThanOrEqual(6);
 
     expect(first.every((t) => t.status === "RESOLVED" || t.status === "CLOSED")).toBe(true);
+    expect(first.every((t) => (t.resolution ?? "").length >= 10)).toBe(true);
     expect(first.every((t) => t.resolvedAt && t.resolvedAt >= t.createdAt)).toBe(true);
     expect(first.every((t) => t.resolutionDue && t.firstRespondedAt && t.resolutionBusinessMinutes && t.firstResponseBusinessMinutes)).toBe(true);
     expect(first.every((t) => t.firstRespondedAt! <= t.resolvedAt!)).toBe(true);

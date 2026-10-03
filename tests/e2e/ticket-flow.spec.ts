@@ -55,6 +55,8 @@ test("fluxo completo: solicitante abre, agente atende, nota interna fica oculta,
   await agent.page.getByRole("button", { name: /Marcar como em andamento/i }).click();
   await expect(agent.page.getByText("Em andamento", { exact: true }).first()).toBeVisible();
   await agent.page.getByRole("button", { name: /Marcar como resolvido/i }).click();
+  await agent.page.getByLabel("Solução").fill("Reiniciei o equipamento e conferi o funcionamento.");
+  await agent.page.getByRole("button", { name: "Resolver chamado" }).click();
   await expect(agent.page.getByText("Resolvido", { exact: true }).first()).toBeVisible();
 
   // 3. Solicitante vê a resolução, mas não a nota interna
