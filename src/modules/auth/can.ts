@@ -53,8 +53,6 @@ export function can(user: SessionUser, action: Action, resource?: TicketResource
       return isStaff(user);
     case "kb:manage":
       return user.role === "TEAM_LEAD";
-    case "ticket:rate":
-      return false; // tratado acima; aqui só para o switch ser exaustivo
     case "dashboard:view":
       return user.role === "TEAM_LEAD";
     case "ticket:take":
