@@ -26,12 +26,13 @@ export type AuditAction =
   | "kb.update"
   | "kb.publish"
   | "kb.unpublish"
-  | "kb.delete";
+  | "kb.delete"
+  | "ai.reindex";
 
 export interface AuditEntry {
   actorId: string;
   action: AuditAction;
-  targetType: "user" | "invite" | "team" | "category" | "apikey" | "sla" | "ticket" | "kb";
+  targetType: "user" | "invite" | "team" | "category" | "apikey" | "sla" | "ticket" | "kb" | "ai";
   targetId: string;
   data?: Record<string, unknown>;
 }

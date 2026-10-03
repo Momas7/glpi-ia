@@ -1,5 +1,6 @@
 import type { Priority } from "@/generated/prisma/client";
 import { getConfig, type Config } from "@/lib/config";
+import { enqueue } from "@/lib/queue";
 import { getDb } from "@/lib/db";
 import { ForbiddenError, NotFoundError } from "@/lib/errors";
 import { recordAudit } from "@/modules/audit";
@@ -9,6 +10,7 @@ import { stripCitations, type DraftSourceRef } from "./draft";
 import { getEmbeddingProvider } from "./embedding/factory";
 import { defaultTriageModel } from "./pricing";
 import { getLlmProvider } from "./provider/factory";
+import { AI_REINDEX_QUEUE } from "./enqueue";
 import { startOfDay } from "./run";
 import { isSuggestionStale, type TriageBasis } from "./stale";
 
@@ -75,12 +77,22 @@ export async function pendingTriageTicketIds(actor: SessionUser, tickets: Ticket
 
 type OverviewConfig = Pick<
   Config,
-  "AI_ENABLED" | "LLM_PROVIDER" | "GEMINI_API_KEY" | "ANTHROPIC_API_KEY" | "AI_MODEL_TRIAGE" | "AI_DAILY_BUDGET" | "APP_TIMEZONE"
+  | "AI_ENABLED"
+  | "LLM_PROVIDER"
+  | "EMBEDDING_PROVIDER"
+  | "GEMINI_API_KEY"
+  | "ANTHROPIC_API_KEY"
+  | "AI_MODEL_TRIAGE"
+  | "AI_DAILY_BUDGET"
+  | "APP_TIMEZONE"
 >;
 
 export interface AiOverview {
   enabled: boolean;
   reason: string | null;
+  /** Por que a busca por conhecimento (embeddings) não funciona, quando não funciona. */
+  ragReason: string | null;
+  knowledge: { articles: number; chunks: number; tickets: number };
   provider: string;
   model: string;
   spentTodayUsd: number;
@@ -115,7 +127,9 @@ export async function getAiOverview(actor: SessionUser, config: OverviewConfig =
       ? `Sem chave de API para o provider ${config.LLM_PROVIDER}.`
       : null;
 
-  const [spent, grouped, teams, recent] = await Promise.all([
+  const ragReason = getEmbeddingProvider(config) === null ? `Sem chave de API para embeddings (provider ${config.EMBEDDING_PROVIDER}).` : null;
+
+  const [spent, grouped, teams, recent, articles, chunks, indexedTickets] = await Promise.all([
     db.aiAuditLog.aggregate({ _sum: { costUsd: true }, where: { createdAt: { gte: startOfDay(new Date(), config.APP_TIMEZONE) } } }),
     db.aiSuggestion.groupBy({ by: ["status"], where: { kind: "TRIAGE" }, _count: { _all: true } }),
     db.team.findMany({ select: { id: true, name: true, aiEnabled: true }, orderBy: { name: "asc" } }),
@@ -124,11 +138,16 @@ export async function getAiOverview(actor: SessionUser, config: OverviewConfig =
       take: 20,
       select: { id: true, createdAt: true, jobType: true, model: true, inputTokens: true, outputTokens: true, costUsd: true, latencyMs: true, outcome: true },
     }),
+    db.kbArticle.count({ where: { published: true } }),
+    db.$queryRaw<{ n: bigint }[]>`SELECT count(*) AS n FROM "KbChunk"`,
+    db.$queryRaw<{ n: bigint }[]>`SELECT count(*) AS n FROM "TicketEmbedding"`,
   ]);
   const count = (status: string) => grouped.find((g) => g.status === status)?._count._all ?? 0;
   return {
     enabled: reason === null,
     reason,
+    ragReason,
+    knowledge: { articles, chunks: Number(chunks[0].n), tickets: Number(indexedTickets[0].n) },
     provider: config.LLM_PROVIDER,
     model: config.AI_MODEL_TRIAGE ?? defaultTriageModel(config.LLM_PROVIDER),
     spentTodayUsd: Number(spent._sum.costUsd ?? 0),
@@ -175,4 +194,13 @@ export async function getDraftView(actor: SessionUser, ticket: TicketWithRefs, c
     available,
     draft: { id: comment.id, text: stripCitations(comment.body), sources: (comment.sources ?? []) as unknown as DraftSourceRef[] },
   };
+}
+
+/** Pede a reindexação de tudo (artigos publicados e chamados resolvidos); o worker processa em lotes, com pausa. */
+export async function requestReindex(actor: SessionUser): Promise<void> {
+  assertAdmin(actor);
+  await getDb().$transaction(async (tx) => {
+    await recordAudit(tx, { actorId: actor.id, action: "ai.reindex", targetType: "ai", targetId: "knowledge", data: {} });
+    await enqueue(AI_REINDEX_QUEUE, {}, { tx });
+  });
 }

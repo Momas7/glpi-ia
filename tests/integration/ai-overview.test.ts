@@ -16,7 +16,7 @@ const session = (u: { id: string; name: string; email: string }, role: SessionUs
 });
 
 const cfg = (over: Record<string, unknown> = {}) =>
-  ({ AI_ENABLED: true, LLM_PROVIDER: "fake", AI_DAILY_BUDGET: 5, APP_TIMEZONE: "America/Sao_Paulo", ...over }) as never;
+  ({ AI_ENABLED: true, LLM_PROVIDER: "fake", EMBEDDING_PROVIDER: "fake", AI_DAILY_BUDGET: 5, APP_TIMEZONE: "America/Sao_Paulo", ...over }) as never;
 
 beforeAll(async () => {
   testDb = await startTestDb();
@@ -33,6 +33,10 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  await db.$executeRawUnsafe(`DO $$ BEGIN IF to_regclass('pgboss.job') IS NOT NULL THEN DELETE FROM pgboss.job WHERE name = 'ai.reindex_all'; END IF; END $$`);
+  await db.$executeRawUnsafe(`DELETE FROM "TicketEmbedding"`);
+  await db.$executeRawUnsafe(`DELETE FROM "KbChunk"`);
+  await db.kbArticle.deleteMany();
   await db.auditLog.deleteMany();
   await db.aiAuditLog.deleteMany();
   await db.aiSuggestion.deleteMany();
@@ -116,5 +120,40 @@ describe("setTeamAi", () => {
   it("não-admin recebe 403 e equipe inexistente 404", async () => {
     await expect(ai.setTeamAi(agent, teamA, false)).rejects.toMatchObject({ status: 403 });
     await expect(ai.setTeamAi(admin, "nao-existe", false)).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("índice de conhecimento", () => {
+  const zero = `[${new Array(768).fill(0).join(",")}]`;
+
+  it("conta artigos publicados, trechos e chamados indexados", async () => {
+    const adminRow = await db.user.findFirstOrThrow({ where: { role: "ADMIN" } });
+    const pub = await db.kbArticle.create({ data: { title: "Publicado", body: "x", published: true, createdById: adminRow.id, updatedById: adminRow.id } });
+    await db.kbArticle.create({ data: { title: "Rascunho", body: "y", published: false, createdById: adminRow.id, updatedById: adminRow.id } });
+    await db.$executeRaw`INSERT INTO "KbChunk" ("id","articleId","position","text","contentHash","embedding") VALUES ('c1', ${pub.id}, 0, 't', 'h', ${zero}::vector)`;
+    await db.$executeRaw`INSERT INTO "KbChunk" ("id","articleId","position","text","contentHash","embedding") VALUES ('c2', ${pub.id}, 1, 't2', 'h2', ${zero}::vector)`;
+    await db.$executeRaw`INSERT INTO "TicketEmbedding" ("ticketId","contentHash","embedding") VALUES (${ticketIds[0]}, 'h', ${zero}::vector)`;
+    const o = await ai.getAiOverview(admin, cfg());
+    expect(o.knowledge).toEqual({ articles: 1, chunks: 2, tickets: 1 });
+  });
+
+  it("explica quando falta a chave do provider de embeddings", async () => {
+    const o = await ai.getAiOverview(admin, cfg({ EMBEDDING_PROVIDER: "gemini" }));
+    expect(o.ragReason).toMatch(/embeddings.*gemini/i);
+    expect((await ai.getAiOverview(admin, cfg())).ragReason).toBeNull();
+  });
+});
+
+describe("requestReindex", () => {
+  it("enfileira a reindexação e audita", async () => {
+    await ai.requestReindex(admin);
+    const jobs = await db.$queryRaw<{ n: bigint }[]>`SELECT count(*) AS n FROM pgboss.job WHERE name = 'ai.reindex_all'`;
+    expect(Number(jobs[0].n)).toBe(1);
+    expect(await db.auditLog.count({ where: { action: "ai.reindex", actorId: admin.id } })).toBe(1);
+  });
+
+  it("não-admin recebe 403 e nada é enfileirado", async () => {
+    await expect(ai.requestReindex(agent)).rejects.toMatchObject({ status: 403 });
+    expect(await db.auditLog.count({ where: { action: "ai.reindex" } })).toBe(0);
   });
 });

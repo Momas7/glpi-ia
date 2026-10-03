@@ -13,6 +13,7 @@ export {
   getDraftView,
   getPendingTriage,
   pendingTriageTicketIds,
+  requestReindex,
   setTeamAi,
   type AiOverview,
   type DraftView,
