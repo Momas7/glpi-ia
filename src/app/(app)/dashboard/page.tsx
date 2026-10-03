@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { DashboardFilters } from "@/components/dashboard/Filters";
 import { CategoryChart, TeamSlaChart, TrendChart, WeeklyChart } from "@/components/dashboard/Charts";
+import { AiAssistSection } from "@/components/dashboard/AiAssistSection";
+import { AiUsageSection } from "@/components/dashboard/AiUsageSection";
+import { CsatSection } from "@/components/dashboard/CsatSection";
+import { DashboardNotes } from "@/components/dashboard/DashboardNotes";
 import { KpiCards } from "@/components/dashboard/KpiCards";
 import { DueSoonTable, WorkloadTable } from "@/components/dashboard/Tables";
 import { getDb } from "@/lib/db";
@@ -71,6 +75,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <TeamSlaChart data={data.slaByTeam} />
         <TrendChart data={data.trend} />
       </div>
+      <CsatSection csat={data.csat} />
+      <AiAssistSection data={data.aiAssist} />
+      {data.aiUsage && <AiUsageSection usage={data.aiUsage} />}
+      <DashboardNotes hasDemoData={data.hasDemoData} />
     </div>
   );
 }
