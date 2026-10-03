@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { DashboardFilters } from "@/components/dashboard/Filters";
+import { CategoryChart, TeamSlaChart, TrendChart, WeeklyChart } from "@/components/dashboard/Charts";
 import { KpiCards } from "@/components/dashboard/KpiCards";
+import { DueSoonTable, WorkloadTable } from "@/components/dashboard/Tables";
 import { getDb } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { assertDashboardPage } from "@/lib/dashboard-guard";
@@ -59,6 +61,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <DashboardFilters teams={teams} selectedTeamId={team} period={data.period} />
       </div>
       <KpiCards kpis={data.kpis} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <DueSoonTable rows={data.dueSoon} />
+        <WorkloadTable rows={data.workload} />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <WeeklyChart data={data.weekly} />
+        <CategoryChart data={data.byCategory} />
+        <TeamSlaChart data={data.slaByTeam} />
+        <TrendChart data={data.trend} />
+      </div>
     </div>
   );
 }
