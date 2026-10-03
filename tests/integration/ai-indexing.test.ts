@@ -128,6 +128,39 @@ describe("indexArticle", () => {
   });
 });
 
+describe("troca de modelo ou de provider", () => {
+  it("artigo: com o mesmo modelo nada muda; com outro modelo ou provider tudo é reindexado", async () => {
+    const a = await article("Wi-Fi", "Reinicie o roteador.");
+    await indexing.indexArticle(a.id, deps());
+    expect(await indexing.indexArticle(a.id, deps())).toBe("unchanged");
+    expect(await indexing.indexArticle(a.id, deps({ model: "gemini-embedding-002" }))).toBe("indexed");
+    expect(await indexing.indexArticle(a.id, deps({ model: "gemini-embedding-002" }))).toBe("unchanged");
+    const gemini: EmbeddingProvider = { name: "gemini", embed: (t, o) => new FakeEmbeddingProvider().embed(t, o) };
+    expect(await indexing.indexArticle(a.id, deps({ model: "gemini-embedding-002", provider: gemini }))).toBe("indexed");
+  });
+
+  it("chamado: trocar o modelo reindexa e o 'Reindexar tudo' refaz tudo", async () => {
+    const t = await resolved();
+    await indexing.indexTicket(t.id, deps());
+    expect(await indexing.indexTicket(t.id, deps({ model: "gemini-embedding-002" }))).toBe("indexed");
+    const out = await indexing.reindexAll({ batchSize: 5, pauseMs: 0, sleep: async () => {} }, deps({ model: "gemini-embedding-003" }));
+    expect(out.tickets).toBe(1);
+  });
+});
+
+describe("equipe com a IA desligada", () => {
+  it("o chamado da equipe não é enviado ao provider e sai do índice", async () => {
+    const team = await db.team.create({ data: { name: "RH" } });
+    const t = await resolved({ teamId: team.id });
+    expect(await indexing.indexTicket(t.id, deps())).toBe("indexed");
+    await db.team.update({ where: { id: team.id }, data: { aiEnabled: false } });
+    const before = calls;
+    expect(await indexing.indexTicket(t.id, deps({ model: "gemini-embedding-002" }))).toBe("removed");
+    expect(calls).toBe(before);
+    expect(await embedded(t.id)).toBe(false);
+  });
+});
+
 describe("indexTicket", () => {
   it("chamado resolvido com solução é indexado com título, descrição e solução", async () => {
     const t = await resolved();

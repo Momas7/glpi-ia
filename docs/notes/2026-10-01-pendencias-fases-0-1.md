@@ -108,6 +108,21 @@ Registro do que ficou adiado nas revisões independentes e das decisões que mud
 - Artigos sem versionamento: editar sobrescreve, sem histórico além do `AuditLog`.
 - "Reindexar tudo" ignora a cota restante do provedor: em plano gratuito pode parar no meio (basta repetir).
 
+## Fase 4 (RAG): revisão final, menores adiados e decisão de produto
+
+- **Decisão sua:** as fontes de chamados seguem o acesso do técnico (equipe dele, responsável ou solicitante), como no spec. Admin, ou técnico que é responsável/solicitante de um chamado de outra equipe, pode ver essas fontes no rascunho de um chamado da equipe A, e a nota interna do rascunho é lida pela equipe toda. Se quiser isolamento estrito, é só filtrar as fontes de chamado pela equipe do chamado de destino.
+- Artigo editado com a IA em `BUDGET` ou desligada deixa o texto antigo na busca até a próxima reindexação (o job termina como "sem mudança").
+- Corrida entre `ai.index_article` e `ai.reindex_all` no mesmo artigo pode duplicar trechos (falta `UNIQUE(articleId, position)` e trava consultiva).
+- Teto de gasto estourado no embedding da pergunta aparece como "sem fontes" no cartão do rascunho.
+- Dois pedidos de rascunho simultâneos podem deixar dois `AI_DRAFT` (a tela mostra o mais recente).
+- O cartão do rascunho diz "só você vê" mas a equipe toda vê a nota interna.
+- Modelo de rascunho do Gemini fixo em `gemini-3.8-flash` (o spec diz "o modelo da triagem") e fora da tabela de preços (cobrado pelo preço mais alto).
+- Com o provider `fake` o teto diário é consumido pelo preço do modelo de embedding configurado.
+- Validação de citações olha só o array `citations`, não as marcas `[n]` do texto; o bloco FONTES não tem delimitador próprio.
+- A avaliação dada em Resolvido sobrevive à reabertura (e uma nota baixa antiga tira o chamado da base para sempre); o status é checado fora da transação.
+- Estrelas: a seta muda a nota mas o foco não acompanha o rádio (padrão ARIA de radiogroup).
+- `reindexAll` aborta no primeiro erro não temporário e as novas tentativas voltam a parar no mesmo item.
+
 ## Dependências de desenvolvimento com aviso de segurança
 
 - `braces` (GHSA-vfj7-8cjw-p6xm, negação de serviço por padrões aninhados, severidade alta) não tem versão corrigida (a última, 3.0.3, é a afetada). Entra só por ferramentas de desenvolvimento (CLI do `shadcn` e `eslint-config-next`, via `fast-glob`/`micromatch`). O `shadcn` foi movido para `devDependencies` e o job `audit` do CI audita só as dependências de produção (`--omit=dev`). Rever quando houver versão corrigida do `braces` ou das ferramentas que o usam.

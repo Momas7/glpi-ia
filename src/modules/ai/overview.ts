@@ -6,7 +6,7 @@ import { ForbiddenError, NotFoundError } from "@/lib/errors";
 import { recordAudit } from "@/modules/audit";
 import { can, type SessionUser } from "@/modules/auth";
 import type { TicketWithRefs } from "@/modules/tickets";
-import { stripCitations, type DraftSourceRef } from "./draft";
+import { stripCitations, teamAiEnabled, type DraftSourceRef } from "./draft";
 import { getEmbeddingProvider } from "./embedding/factory";
 import { defaultTriageModel } from "./pricing";
 import { getLlmProvider } from "./provider/factory";
@@ -183,7 +183,8 @@ type DraftViewConfig = Pick<
 /** O rascunho de resposta do chamado (nota interna `AI_DRAFT`) e se dá para pedir outro. */
 export async function getDraftView(actor: SessionUser, ticket: TicketWithRefs, config: DraftViewConfig = getConfig()): Promise<DraftView> {
   if (!can(actor, "ai:decide", ticket)) return { available: false, draft: null };
-  const available = config.AI_ENABLED && getLlmProvider(config) !== null && getEmbeddingProvider(config) !== null;
+  const available =
+    config.AI_ENABLED && getLlmProvider(config) !== null && getEmbeddingProvider(config) !== null && (await teamAiEnabled(ticket.teamId));
   if (!can(actor, "comment:read_internal", ticket)) return { available, draft: null };
   const comment = await getDb().comment.findFirst({
     where: { ticketId: ticket.id, source: "AI_DRAFT", internal: true },

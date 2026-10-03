@@ -130,6 +130,12 @@ describe("getDraftView", () => {
     expect(await ai.getDraftView(agent, t, config())).toEqual({ available: true, draft: null });
   });
 
+  it("equipe com a IA desligada: o botão não aparece", async () => {
+    const t = await withDraft();
+    await db.team.update({ where: { id: teamN1 }, data: { aiEnabled: false } });
+    expect((await ai.getDraftView(agent, t, config())).available).toBe(false);
+  });
+
   it("solicitante e técnico de outra equipe não têm nada", async () => {
     const t = await withDraft();
     expect(await ai.getDraftView(requester, t, config())).toEqual({ available: false, draft: null });

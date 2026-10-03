@@ -140,6 +140,17 @@ describe("searchKnowledge", () => {
     expect(ids(await ask(agent))).toContain(foreign.id);
   });
 
+  it("chamado de equipe com a IA desligada deixa de aparecer, mesmo já indexado", async () => {
+    const on = await resolvedTicket("Wi-Fi equipe ligada", t1);
+    const off = await resolvedTicket("Wi-Fi equipe desligada", t1);
+    expect(ids(await ask(agent))).toEqual(expect.arrayContaining([on.id, off.id]));
+    const rh = await db.team.create({ data: { name: "RH", aiEnabled: false } });
+    await db.ticket.update({ where: { id: off.id }, data: { teamId: rh.id, assigneeId: agent.id } });
+    const out = ids(await ask(agent));
+    expect(out).toContain(on.id);
+    expect(out).not.toContain(off.id);
+  });
+
   it("o próprio chamado nunca é fonte dele mesmo", async () => {
     const self = await resolvedTicket("Wi-Fi do andar caiu", t1);
     const other = await resolvedTicket("Wi-Fi do andar caiu de novo", t1);

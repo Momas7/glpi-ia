@@ -73,6 +73,7 @@ export async function searchKnowledge(
       WHERE t."status" IN ('RESOLVED', 'CLOSED')
         AND t."id" <> ${query.ticketId}
         AND NOT EXISTS (SELECT 1 FROM "TicketRating" r WHERE r."ticketId" = t."id" AND r."stars" <= 2)
+        AND (t."teamId" IS NULL OR EXISTS (SELECT 1 FROM "Team" tm WHERE tm."id" = t."teamId" AND tm."aiEnabled" = true))
         AND (${isAdmin} OR t."teamId" = ANY(${actor.teamIds}::text[]) OR t."assigneeId" = ${actor.id} OR t."requesterId" = ${actor.id})
       ORDER BY e."embedding" <=> ${vec}::vector
       LIMIT ${POOL}`;

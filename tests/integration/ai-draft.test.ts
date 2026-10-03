@@ -218,6 +218,19 @@ describe("suggestDraft", () => {
   });
 });
 
+describe("equipe com a IA desligada", () => {
+  it("não gera rascunho nem chama o modelo para chamado da equipe", async () => {
+    await knowledge();
+    const t = await currentTicket();
+    await db.team.update({ where: { id: t1 }, data: { aiEnabled: false } });
+    const generate = vi.fn();
+    const out = await ai.suggestDraft(agent, t.id, { embed: embedDeps(), llm: llmDeps({ provider: { name: "fake", generate } as LLMProvider }), minSimilarity: 0.05 });
+    expect(out.outcome).toBe("DISABLED");
+    expect(generate).not.toHaveBeenCalled();
+    expect(await drafts(t.id)).toHaveLength(0);
+  });
+});
+
 describe("discardDraft", () => {
   it("apaga o rascunho; quem não pode atender recebe 404", async () => {
     await knowledge();

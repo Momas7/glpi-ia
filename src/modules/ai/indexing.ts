@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { getConfig } from "@/lib/config";
 import { getDb } from "@/lib/db";
 import { chunkText, contentHash } from "./chunking";
 import { runEmbed, type EmbedDeps } from "./embedding/run";
@@ -7,6 +8,17 @@ export type IndexResult = "indexed" | "unchanged" | "removed";
 export type IndexDeps = Partial<EmbedDeps>;
 
 const dbOf = (deps: IndexDeps) => deps.db ?? getDb();
+
+/**
+ * Identifica quem gerou o vetor (provider e modelo). Entra no hash do conteúdo: vetores de modelos diferentes
+ * não são comparáveis, então trocar de modelo ou de provider invalida o índice e "Reindexar tudo" refaz tudo.
+ */
+function embedSignature(deps: IndexDeps): string {
+  if (deps.model !== undefined && deps.provider !== undefined) return `${deps.provider?.name ?? "none"}|${deps.model}`;
+  const config = getConfig();
+  return `${deps.provider?.name ?? config.EMBEDDING_PROVIDER}|${deps.model ?? config.AI_EMBEDDING_MODEL}`;
+}
+const signed = (deps: IndexDeps, text: string) => contentHash(`${embedSignature(deps)}\u0000${text}`);
 
 /** Literal que o pgvector entende: "[0.1,0.2,...]". Sempre passado como parâmetro, nunca concatenado ao SQL. */
 export function toVectorLiteral(v: number[]): string {
@@ -26,7 +38,7 @@ export async function indexArticle(articleId: string, deps: IndexDeps = {}): Pro
   }
 
   const texts = chunkText(`${article.title}\n\n${article.body}`);
-  const hashes = texts.map(contentHash);
+  const hashes = texts.map((t) => signed(deps, t));
   const existing = await db.$queryRaw<{ contentHash: string }[]>`
     SELECT "contentHash" FROM "KbChunk" WHERE "articleId" = ${articleId} ORDER BY "position"`;
   if (existing.length === hashes.length && existing.every((e, i) => e.contentHash === hashes[i])) return "unchanged";
@@ -70,14 +82,18 @@ export async function indexTicket(ticketId: string, deps: IndexDeps = {}): Promi
     await db.$executeRaw`DELETE FROM "TicketEmbedding" WHERE "ticketId" = ${ticketId}`;
     return "removed";
   };
-  const ticket = await db.ticket.findUnique({ where: { id: ticketId }, include: { rating: { select: { stars: true } } } });
+  const ticket = await db.ticket.findUnique({
+    where: { id: ticketId },
+    include: { rating: { select: { stars: true } }, team: { select: { aiEnabled: true } } },
+  });
   if (!ticket || (ticket.status !== "RESOLVED" && ticket.status !== "CLOSED")) return remove();
+  if (ticket.team && !ticket.team.aiEnabled) return remove(); // equipe com a IA desligada: nada dela vai ao provider
   if (ticket.rating && ticket.rating.stars <= 2) return remove();
   const solution = await ticketSolution(db, ticket);
   if (!solution) return remove();
 
   const text = ticketKnowledgeText({ title: ticket.title, description: ticket.description, solution });
-  const hash = contentHash(text);
+  const hash = signed(deps, text);
   const existing = await db.$queryRaw<{ contentHash: string }[]>`
     SELECT "contentHash" FROM "TicketEmbedding" WHERE "ticketId" = ${ticketId}`;
   if (existing[0]?.contentHash === hash) return "unchanged";

@@ -95,6 +95,13 @@ async function loadDraftableTicket(actor: SessionUser, ticketId: string) {
   return ticket;
 }
 
+/** `Team.aiEnabled` do interruptor por equipe; chamado sem equipe segue o interruptor geral. */
+export async function teamAiEnabled(teamId: string | null): Promise<boolean> {
+  if (!teamId) return true;
+  const team = await getDb().team.findUnique({ where: { id: teamId }, select: { aiEnabled: true } });
+  return team?.aiEnabled ?? true;
+}
+
 function resolveModel(deps: DraftDeps): string {
   if (deps.model) return deps.model;
   if (deps.llm?.provider) return defaultDraftModel(deps.llm.provider.name);
@@ -108,6 +115,8 @@ function resolveModel(deps: DraftDeps): string {
  */
 export async function suggestDraft(actor: SessionUser, ticketId: string, deps: DraftDeps = {}): Promise<DraftResult> {
   const ticket = await loadDraftableTicket(actor, ticketId);
+  // Equipe com a IA desligada: o chamado dela não vai a nenhum provider.
+  if (!(await teamAiEnabled(ticket.teamId))) return { outcome: "DISABLED" };
   const sources = await searchKnowledge(
     actor,
     { ticketId, text: `${ticket.title}\n\n${ticket.description}`.slice(0, TEXT_LIMIT) },
