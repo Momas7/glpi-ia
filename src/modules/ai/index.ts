@@ -11,12 +11,14 @@ export { decideSuggestion, decisionSchema, type Decision } from "./decisions";
 export {
   getAiOverview,
   getDraftView,
+  getSummaryView,
   getPendingTriage,
   pendingTriageTicketIds,
   requestReindex,
   setTeamAi,
   type AiOverview,
   type DraftView,
+  type SummaryView,
   type PendingTriage,
 } from "./overview";
 export { evaluateRetrieval, evaluateTriage, type EmbedFn, type EvalCase, type EvalReport, type RagCase, type RagReport } from "./eval";
@@ -42,3 +44,4 @@ export {
 export { AI_DETECT_QUEUE } from "./enqueue";
 export { detectForTicket, findDuplicates, type DetectConfig, type DetectDeps, type DuplicateCandidate } from "./detect";
 export { closeFinishedIncidents, closeIncident, detectIncident, getIncidentNotice, getOpenIncidentBanner, listIncidents, type IncidentRow } from "./incidents";
+export { MIN_SUMMARY_COMMENTS, buildSummaryPrompt, summarizeTicket, summaryOutputSchema, type SummaryResult } from "./summary";

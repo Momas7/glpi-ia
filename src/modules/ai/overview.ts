@@ -7,6 +7,7 @@ import { recordAudit } from "@/modules/audit";
 import { can, type SessionUser } from "@/modules/auth";
 import type { TicketWithRefs } from "@/modules/tickets";
 import { stripCitations, teamAiEnabled, type DraftSourceRef } from "./draft";
+import { realComments } from "./summary";
 import { getEmbeddingProvider } from "./embedding/factory";
 import { defaultTriageModel } from "./pricing";
 import { getLlmProvider } from "./provider/factory";
@@ -204,4 +205,31 @@ export async function requestReindex(actor: SessionUser): Promise<void> {
     await recordAudit(tx, { actorId: actor.id, action: "ai.reindex", targetType: "ai", targetId: "knowledge", data: {} });
     await enqueue(AI_REINDEX_QUEUE, {}, { tx });
   });
+}
+
+export interface SummaryView {
+  available: boolean;
+  /** Comentários do chamado (sem rascunhos da IA): o botão só vale a partir de 3. */
+  commentCount: number;
+  summary: { text: string; commentCount: number; newComments: number } | null;
+}
+
+type SummaryViewConfig = Pick<Config, "AI_ENABLED" | "LLM_PROVIDER" | "GEMINI_API_KEY" | "ANTHROPIC_API_KEY">;
+
+/** O resumo salvo do chamado e quantos comentários vieram depois dele; só para quem atende o chamado. */
+export async function getSummaryView(actor: SessionUser, ticket: TicketWithRefs, config: SummaryViewConfig = getConfig()): Promise<SummaryView> {
+  if (!can(actor, "ai:decide", ticket)) return { available: false, commentCount: 0, summary: null };
+  const db = getDb();
+  const available = config.AI_ENABLED && getLlmProvider(config) !== null && (await teamAiEnabled(ticket.teamId));
+  const [commentCount, saved] = await Promise.all([
+    db.comment.count({ where: { ticketId: ticket.id, ...realComments } }),
+    db.aiSuggestion.findUnique({ where: { ticketId_kind: { ticketId: ticket.id, kind: "SUMMARY" } } }),
+  ]);
+  if (!saved) return { available, commentCount, summary: null };
+  const payload = saved.payload as { text: string; commentCount: number; lastCommentId: string };
+  const last = await db.comment.findUnique({ where: { id: payload.lastCommentId }, select: { createdAt: true } });
+  const newComments = last
+    ? await db.comment.count({ where: { ticketId: ticket.id, ...realComments, createdAt: { gt: last.createdAt } } })
+    : Math.max(0, commentCount - payload.commentCount);
+  return { available, commentCount, summary: { text: payload.text, commentCount: payload.commentCount, newComments } };
 }
