@@ -14,7 +14,7 @@ describe("estimateCostUsd", () => {
     expect(estimateCostUsd("gemini-2.0-flash", 1_000_000, 0)).toBe(15);
   });
   it("escolhe o modelo pequeno por provider", () => {
-    expect(defaultTriageModel("gemini")).toBe("gemini-2.5-flash");
+    expect(defaultTriageModel("gemini")).toBe("gemini-3.8-flash");
     expect(defaultTriageModel("anthropic")).toMatch(/^claude-haiku/);
     expect(defaultTriageModel("fake")).toBe("fake-triage");
   });

@@ -17,5 +17,5 @@ export function estimateCostUsd(model: string, inputTokens: number, outputTokens
 }
 
 export function defaultTriageModel(provider: ProviderName): string {
-  return { fake: "fake-triage", gemini: "gemini-2.5-flash", anthropic: "claude-haiku-4-5-20251001" }[provider];
+  return { fake: "fake-triage", gemini: "gemini-3.8-flash", anthropic: "claude-haiku-4-5-20251001" }[provider];
 }

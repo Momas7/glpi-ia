@@ -30,7 +30,9 @@ const categories = [
 
 const cases = JSON.parse(readFileSync("tests/ai-eval/dataset.json", "utf8")) as EvalCase[];
 const model = config.AI_MODEL_TRIAGE ?? defaultTriageModel(provider.name);
-const report = await evaluateTriage(provider, { categories, teams }, cases, model);
+// Pausa entre os casos para caber no limite por minuto dos planos gratuitos (AI_EVAL_DELAY_MS=0 para desligar).
+const delayMs = Number(process.env.AI_EVAL_DELAY_MS ?? (provider.name === "fake" ? 0 : 6000));
+const report = await evaluateTriage(provider, { categories, teams }, cases, model, { delayMs });
 
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 console.log(`Provider: ${provider.name} · modelo: ${model} · casos: ${report.total}`);

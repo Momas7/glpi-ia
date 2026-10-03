@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { evaluateTriage, type EvalCase } from "@/modules/ai/eval";
 import { FakeLLMProvider } from "@/modules/ai/provider/fake";
+import { AiError } from "@/modules/ai/types";
 
 const catalog = {
   categories: [
@@ -49,5 +50,31 @@ describe("evaluateTriage", () => {
     const r = await evaluateTriage(new FakeLLMProvider(), catalog, [none], "fake-triage");
     expect(r.categoryAccuracy).toBe(1);
     expect(r.teamAccuracy).toBe(1);
+  });
+
+  it("tenta de novo em erro temporário, com espera crescente, e pausa entre os casos", async () => {
+    let calls = 0;
+    const flaky = new FakeLLMProvider(({ user }) => {
+      if (++calls === 1) throw new AiError("429", true);
+      return { categoryId: "c1", priority: "MEDIUM", teamId: "t1", confidence: 0.9, echo: user.length };
+    });
+    const waits: number[] = [];
+    const r = await evaluateTriage(flaky, catalog, cases, "fake-triage", {
+      delayMs: 50,
+      retryBaseMs: 100,
+      sleep: async (ms) => void waits.push(ms),
+    });
+    expect(r.failures.map((f) => f.title)).toEqual(["Senha"]); // o primeiro caso acertou depois da nova tentativa
+    expect(waits).toEqual([100, 50]); // nova tentativa (100) e uma pausa entre os dois casos (50)
+  });
+
+  it("erro não temporário não é repetido", async () => {
+    let calls = 0;
+    const bad = new FakeLLMProvider(() => {
+      calls++;
+      throw new AiError("chave inválida", false);
+    });
+    await evaluateTriage(bad, catalog, [cases[0]], "fake-triage", { sleep: async () => {} });
+    expect(calls).toBe(1);
   });
 });

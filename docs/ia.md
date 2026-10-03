@@ -22,7 +22,7 @@ Tudo por variáveis de ambiente (`.env`); veja `.env.example`.
 | `AI_ENABLED` | `false` | Interruptor geral. Desligado, nada é enviado a nenhum LLM. |
 | `LLM_PROVIDER` | `fake` | `fake` (testes e demonstração, sem chave), `gemini` ou `anthropic`. |
 | `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` | vazio | Chave do provider escolhido. Sem ela a IA conta como desligada e a tela explica o motivo. |
-| `AI_MODEL_TRIAGE` | modelo pequeno do provider | `gemini-2.5-flash` ou `claude-haiku-4-5-20251001`. |
+| `AI_MODEL_TRIAGE` | modelo pequeno do provider | `gemini-3.8-flash` ou `claude-haiku-4-5-20251001`. |
 | `AI_DAILY_BUDGET` | `5` | Teto diário de gasto **estimado**, em USD. Estourado, a IA pausa até o dia seguinte e os chamados seguem normais. |
 | `AI_TRIAGE_MIN_CONFIDENCE` | `0.6` | Limiar da sugestão. |
 | `AI_AUDIT_RETENTION_DAYS` | `30` | Quanto tempo o texto mascarado fica no log. |
@@ -40,7 +40,7 @@ Antes de qualquer texto sair para o LLM, o sistema troca por tokens reversíveis
 
 ## Medir a qualidade
 
-`npm run ai:eval` roda 40 chamados rotulados (`tests/ai-eval/dataset.json`, incluindo casos ambíguos, injeção de prompt e dados sensíveis) contra o provider configurado e imprime o acerto de categoria, prioridade e equipe, o custo estimado e os erros. Fica fora do CI de propósito: chama o provider escolhido, custa dinheiro e o resultado varia. Com `LLM_PROVIDER=fake` o resultado só valida o funcionamento do script (as regras do fake são por palavra-chave e acertam pouco).
+`npm run ai:eval` roda 40 chamados rotulados (`tests/ai-eval/dataset.json`, incluindo casos ambíguos, injeção de prompt e dados sensíveis) contra o provider configurado e imprime o acerto de categoria, prioridade e equipe, o custo estimado e os erros. Com provider real ele espera 6 s entre os casos (planos gratuitos limitam por minuto; ajuste com `AI_EVAL_DELAY_MS`) e repete em erro temporário. Fica fora do CI de propósito: chama o provider escolhido, custa dinheiro e o resultado varia. Com `LLM_PROVIDER=fake` o resultado só valida o funcionamento do script (as regras do fake são por palavra-chave e acertam pouco).
 
 ## Para desenvolvedores
 
