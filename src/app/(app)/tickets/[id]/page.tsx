@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { AiDraftCard } from "@/components/AiDraftCard";
 import { AiDuplicatesCard } from "@/components/AiDuplicatesCard";
+import { IncidentNotice } from "@/components/IncidentNotice";
 import { AiSuggestionCard } from "@/components/AiSuggestionCard";
 import { LateRating } from "@/components/RatingBox";
 import { AttachmentForm } from "@/components/forms/AttachmentForm";
@@ -13,7 +14,7 @@ import { PriorityBadge, StatusBadge } from "@/components/StatusBadges";
 import { Badge } from "@/components/ui/badge";
 import { TYPE_LABEL, formatDateTime } from "@/lib/labels";
 import { requireUser } from "@/lib/server-session";
-import { getDraftView, getDuplicatesView, getPendingTriage } from "@/modules/ai";
+import { getDraftView, getDuplicatesView, getIncidentNotice, getPendingTriage } from "@/modules/ai";
 import { can } from "@/modules/auth";
 import { loadCalendar, slaState } from "@/modules/sla";
 import { RATING_WINDOW_DAYS, TRANSITIONS, getComments, getRating, getTicket, listAssignmentOptions, listAttachments } from "@/modules/tickets";
@@ -26,13 +27,14 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
   const ticket = await getTicket(user, id);
   if (!ticket) notFound();
 
-  const [comments, attachments, aiSuggestion, rating, draftView, duplicates] = await Promise.all([
+  const [comments, attachments, aiSuggestion, rating, draftView, duplicates, incidentNotice] = await Promise.all([
     getComments(user, id),
     listAttachments(user, id),
     getPendingTriage(user, ticket),
     getRating(user, id),
     getDraftView(user, ticket),
     getDuplicatesView(user, ticket),
+    getIncidentNotice(user, ticket),
   ]);
   const withinRatingWindow =
     ticket.status === "CLOSED" && (!ticket.closedAt || new Date().getTime() <= ticket.closedAt.getTime() + RATING_WINDOW_DAYS * 86_400_000);
@@ -58,6 +60,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
+      {incidentNotice && <IncidentNotice notice={incidentNotice} />}
       {aiSuggestion && <AiSuggestionCard ticketId={ticket.id} suggestion={aiSuggestion} />}
       {duplicates && <AiDuplicatesCard ticketId={ticket.id} suggestion={duplicates} />}
 
