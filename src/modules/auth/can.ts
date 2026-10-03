@@ -20,7 +20,8 @@ export type Action =
   | "dashboard:view"
   | "ai:decide"
   | "kb:read"
-  | "kb:manage";
+  | "kb:manage"
+  | "ticket:rate";
 
 export interface TicketResource {
   requesterId?: string;
@@ -35,6 +36,10 @@ export function can(user: SessionUser, action: Action, resource?: TicketResource
   if (action === "ticket:reopen" || action === "ticket:confirm") {
     return !!resource && resource.requesterId === user.id && resource.status === "RESOLVED";
   }
+  // Avaliar o atendimento é do solicitante: nem o ADMIN avalia em nome dele.
+  if (action === "ticket:rate") {
+    return !!resource && resource.requesterId === user.id && (resource.status === "RESOLVED" || resource.status === "CLOSED");
+  }
   if (user.role === "ADMIN") return true;
 
   switch (action) {
@@ -48,6 +53,8 @@ export function can(user: SessionUser, action: Action, resource?: TicketResource
       return isStaff(user);
     case "kb:manage":
       return user.role === "TEAM_LEAD";
+    case "ticket:rate":
+      return false; // tratado acima; aqui só para o switch ser exaustivo
     case "dashboard:view":
       return user.role === "TEAM_LEAD";
     case "ticket:take":

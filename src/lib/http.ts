@@ -70,6 +70,17 @@ export async function readJson(req: Request): Promise<unknown> {
   }
 }
 
+/** Como `readJson`, mas corpo vazio devolve `undefined` (rotas em que o corpo é opcional). */
+export async function readOptionalJson(req: Request): Promise<unknown> {
+  const bytes = await readBodyLimited(req, MAX_JSON_BYTES);
+  if (bytes.length === 0) return undefined;
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    throw new AppError(400, "Corpo da requisição inválido.");
+  }
+}
+
 /** Para rotas públicas (sem sessão): converte erros de domínio e de validação em respostas HTTP. */
 export function withErrors(handler: (req: Request) => Promise<Response>) {
   return async (req: Request): Promise<Response> => {

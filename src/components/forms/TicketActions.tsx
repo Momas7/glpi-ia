@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { RatingFields } from "@/components/RatingBox";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +23,7 @@ export function TicketActions({
   canAssign,
   teams,
   current,
+  rated = false,
 }: {
   ticketId: string;
   canTake: boolean;
@@ -29,11 +31,15 @@ export function TicketActions({
   canAssign: boolean;
   teams: TeamOption[];
   current: { teamId: string | null; assigneeId: string | null };
+  /** Já existe avaliação deste chamado: não oferece as estrelas de novo. */
+  rated?: boolean;
 }) {
   const { run, error, pending } = useAction();
   const [teamId, setTeamId] = useState(current.teamId ?? "");
   const [assigneeId, setAssigneeId] = useState(current.assigneeId ?? "");
   const [reason, setReason] = useState("");
+  const [stars, setStars] = useState(0);
+  const [ratingComment, setRatingComment] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
 
   if (!canTake && !canReopen && !canAssign) return null;
@@ -101,6 +107,7 @@ export function TicketActions({
       {canReopen && (
         <div className="flex flex-col gap-2">
           <p className="text-muted-foreground">O chamado foi resolvido. Ficou tudo certo?</p>
+          {!rated && <RatingFields stars={stars} comment={ratingComment} onStars={setStars} onComment={setRatingComment} />}
           <Label htmlFor="reopen-reason">Motivo da reabertura</Label>
           <Textarea id="reopen-reason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
           <div className="flex flex-wrap gap-2">
@@ -116,7 +123,17 @@ export function TicketActions({
             >
               Reabrir
             </Button>
-            <Button size="sm" disabled={pending} onClick={() => run(`/api/tickets/${ticketId}/confirm`, "POST")}>
+            <Button
+              size="sm"
+              disabled={pending}
+              onClick={() =>
+                run(
+                  `/api/tickets/${ticketId}/confirm`,
+                  "POST",
+                  stars > 0 ? { rating: { stars, ...(ratingComment.trim() ? { comment: ratingComment.trim() } : {}) } } : undefined,
+                )
+              }
+            >
               Confirmar fechamento
             </Button>
           </div>

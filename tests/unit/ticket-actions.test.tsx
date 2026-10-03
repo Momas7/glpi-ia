@@ -6,7 +6,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: 
 
 const { TicketActions } = await import("@/components/forms/TicketActions");
 
-const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ticket: {} }), { status: 200 }));
+const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ ticket: {} }), { status: 200 }));
 
 beforeEach(() => {
   fetchMock.mockClear();
@@ -62,5 +62,21 @@ describe("TicketActions", () => {
   it("sem nenhuma permissão não renderiza ações", () => {
     const { container } = render(<TicketActions {...base} />);
     expect(container.textContent).toBe("");
+  });
+
+  it("'Confirmar fechamento' sem estrelas envia a confirmação sem corpo", async () => {
+    render(<TicketActions {...base} canReopen />);
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar fechamento" }));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/tickets/t1/confirm", expect.objectContaining({ method: "POST" })));
+    expect((fetchMock.mock.calls.at(-1)![1] as RequestInit).body).toBeUndefined();
+  });
+
+  it("'Confirmar fechamento' com estrelas e comentário envia a avaliação junto", async () => {
+    render(<TicketActions {...base} canReopen />);
+    fireEvent.click(screen.getByRole("radio", { name: "5 estrelas" }));
+    fireEvent.change(screen.getByLabelText("Comentário (opcional)"), { target: { value: "Ótimo atendimento" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar fechamento" }));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(JSON.parse((fetchMock.mock.calls.at(-1)![1] as RequestInit).body as string)).toEqual({ rating: { stars: 5, comment: "Ótimo atendimento" } });
   });
 });

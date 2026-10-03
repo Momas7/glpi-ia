@@ -6,6 +6,7 @@ import { can, type SessionUser } from "@/modules/auth";
 import { enqueueIndexTicket } from "@/modules/ai/enqueue";
 import { emitCommentEvent, emitTicketEvent } from "@/modules/integrations";
 import { slaOnStatusChange } from "@/modules/sla";
+import { createRating, ratingSchema, type RatingInput } from "./rating";
 import { loadVisible, ticketInclude, type TicketWithRefs } from "./service";
 
 export const reopenSchema = z.object({ reason: z.string().trim().min(5).max(2000) });
@@ -44,7 +45,9 @@ export async function reopenTicket(actor: SessionUser, id: string, reason: strin
   });
 }
 
-export async function confirmTicket(actor: SessionUser, id: string): Promise<TicketWithRefs> {
+/** Confirma o fechamento; com `rating`, grava a avaliação na mesma operação (nota inválida cancela a confirmação). */
+export async function confirmTicket(actor: SessionUser, id: string, rating?: RatingInput): Promise<TicketWithRefs> {
+  const parsedRating = rating === undefined ? undefined : ratingSchema.parse(rating);
   await loadOwnResolved(actor, id, "ticket:confirm");
   return getDb().$transaction(async (tx) => {
     const claimed = await tx.ticket.updateMany({
@@ -53,6 +56,7 @@ export async function confirmTicket(actor: SessionUser, id: string): Promise<Tic
     });
     if (claimed.count !== 1) throw new AppError(409, NOT_RESOLVED);
     await tx.ticketEvent.create({ data: { ticketId: id, actorId: actor.id, type: "CONFIRMED", data: {} } });
+    if (parsedRating) await createRating(tx, id, actor, parsedRating);
     await emitTicketEvent(tx, "ticket.status_changed", id, { from: "RESOLVED", to: "CLOSED" });
     return tx.ticket.findUniqueOrThrow({ where: { id }, include: ticketInclude });
   });
