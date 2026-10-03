@@ -17,3 +17,6 @@ export {
   type PendingTriage,
 } from "./overview";
 export { evaluateTriage, type EvalCase, type EvalReport } from "./eval";
+export { runEmbed, type EmbedDeps, type EmbedRequest, type EmbedResult } from "./embedding/run";
+export { getEmbeddingProvider } from "./embedding/factory";
+export { EMBEDDING_DIMENSIONS, type EmbeddingProvider } from "./embedding/types";
