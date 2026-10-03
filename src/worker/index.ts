@@ -3,6 +3,7 @@ import { logger } from "@/lib/logger";
 import { registerHandler, scheduleJob, stopQueue } from "@/lib/queue";
 import { registerAiJobs } from "@/modules/ai";
 import { registerWebhookQueues } from "@/modules/integrations";
+import { startHeartbeat } from "@/modules/system";
 import { scanSla } from "@/modules/sla";
 import { autoCloseResolved } from "@/modules/tickets";
 
@@ -24,10 +25,12 @@ async function main() {
   });
   await scheduleJob("sla.scan", "*/5 * * * *"); // a cada 5 minutos
   await registerAiJobs();
+  const stopHeartbeat = startHeartbeat("worker");
   logger.info("worker iniciado");
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, "encerrando worker");
+    stopHeartbeat();
     await stopQueue();
     process.exit(0);
   };
