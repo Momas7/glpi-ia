@@ -25,7 +25,7 @@ export {
   type SummaryView,
   type PendingTriage,
 } from "./overview";
-export { evaluateRetrieval, evaluateTriage, type EmbedFn, type EvalCase, type EvalReport, type RagCase, type RagReport } from "./eval";
+export { evaluateDuplicates, evaluateRetrieval, evaluateTriage, type DupPair, type DupReport, type EmbedFn, type EvalCase, type EvalReport, type RagCase, type RagReport } from "./eval";
 export { runEmbed, type EmbedDeps, type EmbedRequest, type EmbedResult } from "./embedding/run";
 export { getEmbeddingProvider } from "./embedding/factory";
 export { EMBEDDING_DIMENSIONS, type EmbeddingProvider } from "./embedding/types";
