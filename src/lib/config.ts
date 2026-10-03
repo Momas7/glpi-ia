@@ -4,11 +4,19 @@ const boolFromEnv = z
   .enum(["true", "false"])
   .transform((v) => v === "true");
 
+/** O Compose repassa variáveis não definidas como "": tratar como ausentes. */
+const optionalString = z.preprocess((v) => (v === "" ? undefined : v), z.string().optional());
+
 const schema = z.object({
   DATABASE_URL: z.string().min(1),
   SESSION_SECRET: z.string().min(32, "deve ter ao menos 32 caracteres"),
   APP_URL: z.string().url(),
-  LLM_PROVIDER: z.enum(["gemini", "anthropic"]).default("gemini"),
+  LLM_PROVIDER: z.enum(["fake", "gemini", "anthropic"]).default("fake"),
+  GEMINI_API_KEY: optionalString,
+  ANTHROPIC_API_KEY: optionalString,
+  AI_MODEL_TRIAGE: optionalString,
+  AI_TRIAGE_MIN_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.6),
+  AI_AUDIT_RETENTION_DAYS: z.coerce.number().int().min(1).default(30),
   EMBEDDING_PROVIDER: z.enum(["gemini"]).default("gemini"),
   AI_ENABLED: boolFromEnv.default(false),
   AI_DAILY_BUDGET: z.coerce.number().nonnegative().default(5),

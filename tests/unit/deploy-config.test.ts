@@ -21,6 +21,15 @@ describe("configuração de deploy", () => {
     expect(compose).toMatch(/N8N_WEBHOOK_SECRET: \$\{N8N_WEBHOOK_SECRET:-\}/);
   });
 
+  it("repassa a configuração de IA ao ambiente comum de web e worker", () => {
+    // O bloco `&app-env` é compartilhado por web e worker (`*app-env`).
+    expect(compose).toMatch(/worker:[\s\S]*environment: \*app-env/);
+    for (const name of ["AI_ENABLED", "LLM_PROVIDER", "GEMINI_API_KEY", "ANTHROPIC_API_KEY", "AI_DAILY_BUDGET", "AI_TRIAGE_MIN_CONFIDENCE"]) {
+      expect(compose, name).toMatch(new RegExp(`${name}: \\$\\{${name}:-`));
+    }
+    expect(compose).toMatch(/LLM_PROVIDER: \$\{LLM_PROVIDER:-fake\}/);
+  });
+
   it("não traz a senha do banco fixa no repositório", () => {
     expect(compose).not.toMatch(/glpi:glpi@/);
     expect(compose).not.toMatch(/POSTGRES_PASSWORD:\s*glpi\b/);
@@ -41,6 +50,8 @@ describe("configuração de deploy", () => {
     const example = read(".env.example");
     expect(example).toMatch(/^SESSION_SECRET=$/m);
     expect(example).toMatch(/^POSTGRES_PASSWORD=$/m);
+    expect(example).toMatch(/^AI_ENABLED=false$/m);
+    expect(example).toMatch(/^LLM_PROVIDER=fake$/m);
   });
 
   it("inclui o texto da licença do React Bits junto dos componentes copiados", () => {

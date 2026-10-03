@@ -23,8 +23,12 @@ services:
       DATABASE_URL: postgresql://glpi:${POSTGRES_PASSWORD}@postgres:5432/glpi_ia
       SESSION_SECRET: ${SESSION_SECRET:?defina SESSION_SECRET no .env}
       APP_URL: ${APP_URL:-http://localhost:3000}
-      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      LLM_PROVIDER: ${LLM_PROVIDER:-fake}
       AI_ENABLED: ${AI_ENABLED:-false}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_DAILY_BUDGET: ${AI_DAILY_BUDGET:-5}
+      AI_TRIAGE_MIN_CONFIDENCE: ${AI_TRIAGE_MIN_CONFIDENCE:-0.6}
       UPLOAD_DIR: /data/uploads
       N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
       N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:-}
