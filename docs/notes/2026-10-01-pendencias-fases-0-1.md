@@ -148,6 +148,19 @@ Registro do que ficou adiado nas revisões independentes e das decisões que mud
 - A faixa de incidente consulta, a cada página, todos os chamados de cada grupo aberto só para contar; o `role="alert"` repete o anúncio a cada navegação.
 - Casts `as never` em `getIncidentNotice` e `getDuplicatesView` escondem recursos incompletos do typecheck; `APP_URL` é lido de `process.env` direto.
 
+## Fase 6 (métricas, saúde e produção local): menores adiados
+
+- O custo do painel vem da tabela de preços; modelos fora dela são cobrados pelo preço mais alto conhecido (estimativa conservadora).
+- O uso e custo de IA é global: não há recorte por equipe nem por usuário.
+- `/api/health/ready` não tem autenticação (é para healthcheck); devolve só estados fixos, mas revela que a instância está de pé.
+- O batimento do worker é por serviço "worker" único; com mais de uma instância o painel só vê a mais recente.
+- Backup só na mesma máquina; a cópia externa é por conta do dono (está no roteiro).
+- O timer do systemd assume o projeto em `~/glpi_IA`; outro caminho exige editar as unidades.
+- Sem rotação do `estado-backup.json` nem histórico de execuções de backup (só o último).
+- O teste de restauração compara contagens, não o conteúdo linha a linha.
+- O certificado do Caddy é interno: cada navegador pede a exceção uma vez.
+- O Caddyfile não envia HSTS de propósito (valeria para todo o `localhost` do navegador).
+
 ## Dependências de desenvolvimento com aviso de segurança
 
 - `braces` (GHSA-vfj7-8cjw-p6xm, negação de serviço por padrões aninhados, severidade alta) não tem versão corrigida (a última, 3.0.3, é a afetada). Entra só por ferramentas de desenvolvimento (CLI do `shadcn` e `eslint-config-next`, via `fast-glob`/`micromatch`). O `shadcn` foi movido para `devDependencies` e o job `audit` do CI audita só as dependências de produção (`--omit=dev`). Rever quando houver versão corrigida do `braces` ou das ferramentas que o usam.

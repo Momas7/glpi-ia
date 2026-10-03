@@ -19,6 +19,12 @@
     "ai:eval:rag": "tsx --env-file-if-exists=.env scripts/ai-eval-rag.mts",
     "ai:eval:dup": "tsx --env-file-if-exists=.env scripts/ai-eval-dup.mts",
     "ai:reindex": "tsx --env-file-if-exists=.env scripts/ai-reindex.mts",
+    "prod:init": "bash scripts/prod-init.sh",
+    "prod:up": "${COMPOSE:-podman-compose} -f docker-compose.prod.yml --env-file .env.prod up -d --build",
+    "prod:down": "${COMPOSE:-podman-compose} -f docker-compose.prod.yml --env-file .env.prod down",
+    "prod:admin": "${COMPOSE:-podman-compose} -f docker-compose.prod.yml --env-file .env.prod run --rm -e ADMIN_PASSWORD worker npm run admin:create --",
+    "backup": "bash scripts/backup.sh",
+    "restore:test": "bash scripts/restore-test.sh",
     "admin:create": "tsx --env-file-if-exists=.env scripts/create-admin.mts"
   },
   "dependencies": {
