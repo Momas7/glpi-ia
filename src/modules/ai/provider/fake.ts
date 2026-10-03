@@ -45,9 +45,17 @@ const triageHandler: Handler = ({ user }) => {
   };
 };
 
+/** Rascunho determinístico: repete o trecho da primeira fonte e a cita. Ignora instruções escritas nas fontes e no chamado. */
+const draftHandler: Handler = ({ user }) => {
+  const first = /\[1\] \([^)]*\) [^\n]*\n([^\n]*)/.exec(user)?.[1] ?? "";
+  return { answer: `Com base nas fontes: ${first} [1]`, citations: [1] };
+};
+
+const defaultHandler: Handler = (req) => (req.user.includes("FONTES:") ? draftHandler(req) : triageHandler(req));
+
 export class FakeLLMProvider implements LLMProvider {
   readonly name = "fake" as const;
-  constructor(private readonly handler: Handler = triageHandler) {}
+  constructor(private readonly handler: Handler = defaultHandler) {}
 
   async generate<T>(req: LLMRequest<T>): Promise<LLMResult<T>> {
     let raw: unknown;
