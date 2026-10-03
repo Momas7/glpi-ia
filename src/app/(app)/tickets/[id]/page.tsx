@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { AiDraftCard } from "@/components/AiDraftCard";
 import { AiDuplicatesCard } from "@/components/AiDuplicatesCard";
 import { IncidentNotice } from "@/components/IncidentNotice";
+import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { AiSuggestionCard } from "@/components/AiSuggestionCard";
 import { LateRating } from "@/components/RatingBox";
 import { AttachmentForm } from "@/components/forms/AttachmentForm";
@@ -14,7 +15,7 @@ import { PriorityBadge, StatusBadge } from "@/components/StatusBadges";
 import { Badge } from "@/components/ui/badge";
 import { TYPE_LABEL, formatDateTime } from "@/lib/labels";
 import { requireUser } from "@/lib/server-session";
-import { getDraftView, getDuplicatesView, getIncidentNotice, getPendingTriage } from "@/modules/ai";
+import { getDraftView, getDuplicatesView, getIncidentNotice, getPendingTriage, getSummaryView } from "@/modules/ai";
 import { can } from "@/modules/auth";
 import { loadCalendar, slaState } from "@/modules/sla";
 import { RATING_WINDOW_DAYS, TRANSITIONS, getComments, getRating, getTicket, listAssignmentOptions, listAttachments } from "@/modules/tickets";
@@ -27,7 +28,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
   const ticket = await getTicket(user, id);
   if (!ticket) notFound();
 
-  const [comments, attachments, aiSuggestion, rating, draftView, duplicates, incidentNotice] = await Promise.all([
+  const [comments, attachments, aiSuggestion, rating, draftView, duplicates, incidentNotice, summaryView] = await Promise.all([
     getComments(user, id),
     listAttachments(user, id),
     getPendingTriage(user, ticket),
@@ -35,6 +36,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
     getDraftView(user, ticket),
     getDuplicatesView(user, ticket),
     getIncidentNotice(user, ticket),
+    getSummaryView(user, ticket),
   ]);
   const withinRatingWindow =
     ticket.status === "CLOSED" && (!ticket.closedAt || new Date().getTime() <= ticket.closedAt.getTime() + RATING_WINDOW_DAYS * 86_400_000);
@@ -107,6 +109,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
                 <SafeText value={c.body} className="space-y-2 text-sm" />
               </article>
             ))}
+            <AiSummaryCard ticketId={ticket.id} view={summaryView} />
             <AiDraftCard key={draftView.draft?.id ?? "sem-rascunho"} ticketId={ticket.id} available={draftView.available} draft={draftView.draft} />
             {can(user, "comment:create", ticket) && (
               <CommentForm ticketId={ticket.id} canInternal={can(user, "comment:read_internal", ticket)} />
