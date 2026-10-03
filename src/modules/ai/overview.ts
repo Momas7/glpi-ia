@@ -1,7 +1,13 @@
 import type { Priority } from "@/generated/prisma/client";
+import { getConfig, type Config } from "@/lib/config";
 import { getDb } from "@/lib/db";
+import { ForbiddenError, NotFoundError } from "@/lib/errors";
+import { recordAudit } from "@/modules/audit";
 import { can, type SessionUser } from "@/modules/auth";
 import type { TicketWithRefs } from "@/modules/tickets";
+import { defaultTriageModel } from "./pricing";
+import { getLlmProvider } from "./provider/factory";
+import { startOfDay } from "./run";
 
 export interface PendingTriage {
   id: string;
@@ -52,4 +58,81 @@ export async function pendingTriageTicketIds(actor: SessionUser, tickets: Ticket
     select: { ticketId: true },
   });
   return new Set(rows.map((r) => r.ticketId));
+}
+
+type OverviewConfig = Pick<
+  Config,
+  "AI_ENABLED" | "LLM_PROVIDER" | "GEMINI_API_KEY" | "ANTHROPIC_API_KEY" | "AI_MODEL_TRIAGE" | "AI_DAILY_BUDGET" | "APP_TIMEZONE"
+>;
+
+export interface AiOverview {
+  enabled: boolean;
+  reason: string | null;
+  provider: string;
+  model: string;
+  spentTodayUsd: number;
+  budgetUsd: number;
+  acceptance: { pending: number; accepted: number; edited: number; rejected: number };
+  teams: { id: string; name: string; aiEnabled: boolean }[];
+  recent: {
+    id: string;
+    createdAt: Date;
+    jobType: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number;
+    latencyMs: number;
+    outcome: string;
+  }[];
+}
+
+function assertAdmin(actor: SessionUser) {
+  if (!can(actor, "admin:manage")) throw new ForbiddenError();
+}
+
+/** Painel de IA da administração. Não devolve texto de chamado (nem mascarado) nem mensagens de erro. */
+export async function getAiOverview(actor: SessionUser, config: OverviewConfig = getConfig()): Promise<AiOverview> {
+  assertAdmin(actor);
+  const db = getDb();
+  const providerReady = getLlmProvider(config) !== null;
+  const reason = !config.AI_ENABLED
+    ? "IA desligada (AI_ENABLED=false)."
+    : !providerReady
+      ? `Sem chave de API para o provider ${config.LLM_PROVIDER}.`
+      : null;
+
+  const [spent, grouped, teams, recent] = await Promise.all([
+    db.aiAuditLog.aggregate({ _sum: { costUsd: true }, where: { createdAt: { gte: startOfDay(new Date(), config.APP_TIMEZONE) } } }),
+    db.aiSuggestion.groupBy({ by: ["status"], where: { kind: "TRIAGE" }, _count: { _all: true } }),
+    db.team.findMany({ select: { id: true, name: true, aiEnabled: true }, orderBy: { name: "asc" } }),
+    db.aiAuditLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: { id: true, createdAt: true, jobType: true, model: true, inputTokens: true, outputTokens: true, costUsd: true, latencyMs: true, outcome: true },
+    }),
+  ]);
+  const count = (status: string) => grouped.find((g) => g.status === status)?._count._all ?? 0;
+  return {
+    enabled: reason === null,
+    reason,
+    provider: config.LLM_PROVIDER,
+    model: config.AI_MODEL_TRIAGE ?? defaultTriageModel(config.LLM_PROVIDER),
+    spentTodayUsd: Number(spent._sum.costUsd ?? 0),
+    budgetUsd: config.AI_DAILY_BUDGET,
+    acceptance: { pending: count("PENDING"), accepted: count("ACCEPTED"), edited: count("EDITED"), rejected: count("REJECTED") },
+    teams,
+    recent: recent.map((r) => ({ ...r, costUsd: Number(r.costUsd) })),
+  };
+}
+
+/** Liga ou desliga a triagem por IA para uma equipe. */
+export async function setTeamAi(actor: SessionUser, teamId: string, enabled: boolean): Promise<void> {
+  assertAdmin(actor);
+  await getDb().$transaction(async (tx) => {
+    const team = await tx.team.findUnique({ where: { id: teamId } });
+    if (!team) throw new NotFoundError("Equipe não encontrada.");
+    await tx.team.update({ where: { id: teamId }, data: { aiEnabled: enabled } });
+    await recordAudit(tx, { actorId: actor.id, action: "team.ai_toggle", targetType: "team", targetId: teamId, data: { enabled } });
+  });
 }

@@ -53,7 +53,7 @@ function resolveDeps(overrides: Partial<AiDeps>): AiDeps {
   return DEP_KEYS.every((k) => k in overrides) ? (overrides as AiDeps) : { ...defaultDeps(), ...overrides };
 }
 
-function startOfDay(now: Date, timezone: string): Date {
+export function startOfDay(now: Date, timezone: string): Date {
   const d = new TZDate(now, timezone);
   d.setHours(0, 0, 0, 0);
   return new Date(d.getTime());
