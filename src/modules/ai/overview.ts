@@ -94,6 +94,7 @@ export interface AiOverview {
   /** Por que a busca por conhecimento (embeddings) não funciona, quando não funciona. */
   ragReason: string | null;
   knowledge: { articles: number; chunks: number; tickets: number };
+  detection: { duplicatesSuggested: number; duplicatesDismissed: number; incidentsDetected: number; incidentsOpen: number };
   provider: string;
   model: string;
   spentTodayUsd: number;
@@ -130,7 +131,7 @@ export async function getAiOverview(actor: SessionUser, config: OverviewConfig =
 
   const ragReason = getEmbeddingProvider(config) === null ? `Sem chave de API para embeddings (provider ${config.EMBEDDING_PROVIDER}).` : null;
 
-  const [spent, grouped, teams, recent, articles, chunks, indexedTickets] = await Promise.all([
+  const [spent, grouped, teams, recent, articles, chunks, indexedTickets, duplicatesSuggested, duplicatesDismissed, incidentsDetected, incidentsOpen] = await Promise.all([
     db.aiAuditLog.aggregate({ _sum: { costUsd: true }, where: { createdAt: { gte: startOfDay(new Date(), config.APP_TIMEZONE) } } }),
     db.aiSuggestion.groupBy({ by: ["status"], where: { kind: "TRIAGE" }, _count: { _all: true } }),
     db.team.findMany({ select: { id: true, name: true, aiEnabled: true }, orderBy: { name: "asc" } }),
@@ -142,6 +143,10 @@ export async function getAiOverview(actor: SessionUser, config: OverviewConfig =
     db.kbArticle.count({ where: { published: true } }),
     db.$queryRaw<{ n: bigint }[]>`SELECT count(*) AS n FROM "KbChunk"`,
     db.$queryRaw<{ n: bigint }[]>`SELECT count(*) AS n FROM "TicketEmbedding"`,
+    db.aiSuggestion.count({ where: { kind: "DUPLICATE" } }),
+    db.aiSuggestion.count({ where: { kind: "DUPLICATE", status: "REJECTED" } }),
+    db.incidentGroup.count(),
+    db.incidentGroup.count({ where: { status: "OPEN" } }),
   ]);
   const count = (status: string) => grouped.find((g) => g.status === status)?._count._all ?? 0;
   return {
@@ -149,6 +154,7 @@ export async function getAiOverview(actor: SessionUser, config: OverviewConfig =
     reason,
     ragReason,
     knowledge: { articles, chunks: Number(chunks[0].n), tickets: Number(indexedTickets[0].n) },
+    detection: { duplicatesSuggested, duplicatesDismissed, incidentsDetected, incidentsOpen },
     provider: config.LLM_PROVIDER,
     model: config.AI_MODEL_TRIAGE ?? defaultTriageModel(config.LLM_PROVIDER),
     spentTodayUsd: Number(spent._sum.costUsd ?? 0),
