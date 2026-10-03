@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // A animação usa IntersectionObserver e relógio; o componente gráfico do React Bits é trocado por texto fixo.
@@ -59,6 +60,21 @@ describe("KpiCards", () => {
     mockReducedMotion(true);
     render(<KpiCards kpis={kpis} />);
     expect(screen.queryAllByTestId("countup")).toHaveLength(0);
+  });
+
+  it("o HTML do servidor já traz o caminho animado (sem piscar 12 → 0 → 12 na hidratação)", () => {
+    // no servidor não há window; o hook usa o snapshot do servidor
+    const html = renderToString(<KpiCards kpis={kpis} />);
+    expect(html).toContain('data-testid="countup"');
+  });
+
+  it("a animação é escondida de leitores de tela e o valor final fica no rótulo", async () => {
+    mockReducedMotion(false);
+    render(<KpiCards kpis={kpis} />);
+    const abertos = card("Abertos agora");
+    const number = abertos.querySelector("[aria-label='12']");
+    expect(number).not.toBeNull();
+    expect(number!.querySelector("[aria-hidden='true']")).not.toBeNull();
   });
 
   it("com movimento permitido os números usam a animação de contagem", async () => {

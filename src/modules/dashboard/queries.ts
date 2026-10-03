@@ -22,11 +22,14 @@ export interface Kpis {
   avgResolutionMinutes: number | null;
 }
 
-// As colunas de data do Prisma são `timestamp` sem fuso, gravadas em UTC. Para as contas não dependerem do fuso
-// do servidor, toda comparação usa `(coluna AT TIME ZONE 'UTC')` contra um parâmetro `::timestamptz` explícito.
-const col = (name: string): Prisma.Sql => Prisma.raw(`(t."${name}" AT TIME ZONE 'UTC')`);
+// As colunas de data do Prisma são `timestamp` sem fuso, gravadas em UTC. Para as contas não dependerem do fuso do
+// servidor, o PARÂMETRO é que é convertido (`::timestamptz AT TIME ZONE 'UTC'`) e a coluna fica "nua" na comparação:
+// assim o Postgres consegue usar os índices em vez de varrer a tabela.
+const col = (name: string): Prisma.Sql => Prisma.raw(`(t."${name}" AT TIME ZONE 'UTC')`); // para agrupar/extrair, nunca para filtrar
 const at = (d: Date): Prisma.Sql => Prisma.sql`${d.toISOString()}::timestamptz`;
-const between = (name: string, r: DateRange): Prisma.Sql => Prisma.sql`${col(name)} >= ${at(r.from)} AND ${col(name)} < ${at(r.to)}`;
+const utc = (d: Date): Prisma.Sql => Prisma.sql`(${at(d)} AT TIME ZONE 'UTC')`;
+const naked = (name: string): Prisma.Sql => Prisma.raw(`t."${name}"`);
+export const between = (name: string, r: DateRange): Prisma.Sql => Prisma.sql`${naked(name)} >= ${utc(r.from)} AND ${naked(name)} < ${utc(r.to)}`;
 
 /** Condição do escopo sobre "teamId" de Ticket (alias `t`). Sempre parametrizada. */
 const scopeSql = (scope: Scope): Prisma.Sql =>
@@ -35,8 +38,8 @@ const noTeams = (scope: Scope) => scope.teamIds !== null && scope.teamIds.length
 
 const ACTIVE = Prisma.sql`t.status IN ('NEW', 'OPEN', 'PENDING')`;
 const NOT_PAUSED = Prisma.sql`t."pausedAt" IS NULL`;
-const atRiskSql = (now: Date) => Prisma.sql`${ACTIVE} AND ${NOT_PAUSED} AND t."slaWarnedAt" IS NOT NULL AND ${col("resolutionDue")} >= ${at(now)}`;
-const breachedSql = (now: Date) => Prisma.sql`${ACTIVE} AND ${NOT_PAUSED} AND ${col("resolutionDue")} < ${at(now)}`;
+const atRiskSql = (now: Date) => Prisma.sql`${ACTIVE} AND ${NOT_PAUSED} AND t."slaWarnedAt" IS NOT NULL AND ${naked("resolutionDue")} >= ${utc(now)}`;
+const breachedSql = (now: Date) => Prisma.sql`${ACTIVE} AND ${NOT_PAUSED} AND ${naked("resolutionDue")} < ${utc(now)}`;
 
 const num = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
 const pct = (inTime: number, total: number): number | null => (total === 0 ? null : Math.round((inTime / total) * 100));
@@ -124,9 +127,9 @@ export interface WeeklyRow {
   resolved: number;
 }
 
-/** Semanas locais (segunda a domingo) que tocam o período, com zeros nas semanas sem chamados. */
+/** Semanas locais (segunda a domingo) que tocam o período, com zeros nas semanas sem chamados. Uma só consulta. */
 export async function queryWeekly(scope: Scope, period: DateRange, timeZone: string): Promise<WeeklyRow[]> {
-  const local = (name: string) => Prisma.sql`date_trunc('week', ${col(name)} AT TIME ZONE ${timeZone})`;
+  const week = (name: string) => Prisma.sql`date_trunc('week', ${col(name)} AT TIME ZONE ${timeZone})`;
   const rows = noTeams(scope)
     ? []
     : await getDb().$queryRaw<WeeklyRow[]>(Prisma.sql`
@@ -135,13 +138,21 @@ export async function queryWeekly(scope: Scope, period: DateRange, timeZone: str
         date_trunc('week', ${at(period.from)} AT TIME ZONE ${timeZone}),
         date_trunc('week', (${at(period.to)} - interval '1 second') AT TIME ZONE ${timeZone}),
         interval '1 week') AS w
+    ),
+    created AS (
+      SELECT ${week("createdAt")} AS w, COUNT(*)::int AS n FROM "Ticket" t
+      WHERE ${scopeSql(scope)} AND ${between("createdAt", period)} GROUP BY 1
+    ),
+    resolved AS (
+      SELECT ${week("resolvedAt")} AS w, COUNT(*)::int AS n FROM "Ticket" t
+      WHERE ${scopeSql(scope)} AND ${between("resolvedAt", period)} GROUP BY 1
     )
-    SELECT to_char(w, 'YYYY-MM-DD') AS "weekStart",
-      (SELECT COUNT(*) FROM "Ticket" t WHERE ${scopeSql(scope)} AND ${between("createdAt", period)}
-         AND ${local("createdAt")} = w)::int AS created,
-      (SELECT COUNT(*) FROM "Ticket" t WHERE ${scopeSql(scope)} AND ${between("resolvedAt", period)}
-         AND ${local("resolvedAt")} = w)::int AS resolved
-    FROM weeks ORDER BY w`);
+    SELECT to_char(weeks.w, 'YYYY-MM-DD') AS "weekStart",
+           COALESCE(created.n, 0)::int AS created, COALESCE(resolved.n, 0)::int AS resolved
+    FROM weeks
+    LEFT JOIN created ON created.w = weeks.w
+    LEFT JOIN resolved ON resolved.w = weeks.w
+    ORDER BY weeks.w`);
   return rows;
 }
 
@@ -190,7 +201,7 @@ export interface TrendRow {
   slaPercent: number | null;
 }
 
-/** `months`: inícios dos meses locais, do mais antigo ao atual (ver `monthStarts`). */
+/** `months`: inícios dos meses locais, do mais antigo ao atual (ver `monthStarts`). Duas consultas agrupadas por mês. */
 export async function queryTrend(scope: Scope, months: Date[], timeZone: string): Promise<TrendRow[]> {
   const nextMonth = (d: Date) => {
     const z = new TZDate(d.getTime(), timeZone);
@@ -200,18 +211,23 @@ export async function queryTrend(scope: Scope, months: Date[], timeZone: string)
     const z = new TZDate(d.getTime(), timeZone);
     return `${z.getFullYear()}-${String(z.getMonth() + 1).padStart(2, "0")}`;
   };
-  return Promise.all(
-    months.map(async (start) => {
-      const range = { from: start, to: nextMonth(start) };
-      if (noTeams(scope)) return { month: label(start), created: 0, slaPercent: null };
-      const [row] = await getDb().$queryRaw<{ created: number; withDue: number; inTime: number }[]>(Prisma.sql`
-        SELECT COUNT(*) FILTER (WHERE ${between("createdAt", range)})::int AS created,
-               COUNT(*) FILTER (WHERE ${between("resolvedAt", range)} AND t."resolutionDue" IS NOT NULL)::int AS "withDue",
-               COUNT(*) FILTER (WHERE ${between("resolvedAt", range)} AND t."resolutionDue" IS NOT NULL
-                                  AND t."resolvedAt" <= t."resolutionDue")::int AS "inTime"
-        FROM "Ticket" t
-        WHERE ${scopeSql(scope)}`);
-      return { month: label(start), created: Number(row.created), slaPercent: pct(Number(row.inTime), Number(row.withDue)) };
-    }),
-  );
+  if (months.length === 0) return [];
+  if (noTeams(scope)) return months.map((m) => ({ month: label(m), created: 0, slaPercent: null }));
+
+  const range = { from: months[0], to: nextMonth(months[months.length - 1]) };
+  const month = (name: string) => Prisma.sql`to_char(date_trunc('month', ${col(name)} AT TIME ZONE ${timeZone}), 'YYYY-MM')`;
+  const [created, sla] = await Promise.all([
+    getDb().$queryRaw<{ month: string; n: number }[]>(Prisma.sql`
+      SELECT ${month("createdAt")} AS month, COUNT(*)::int AS n FROM "Ticket" t
+      WHERE ${scopeSql(scope)} AND ${between("createdAt", range)} GROUP BY 1`),
+    getDb().$queryRaw<{ month: string; withDue: number; inTime: number }[]>(Prisma.sql`
+      SELECT ${month("resolvedAt")} AS month,
+             COUNT(*) FILTER (WHERE t."resolutionDue" IS NOT NULL)::int AS "withDue",
+             COUNT(*) FILTER (WHERE t."resolutionDue" IS NOT NULL AND t."resolvedAt" <= t."resolutionDue")::int AS "inTime"
+      FROM "Ticket" t
+      WHERE ${scopeSql(scope)} AND ${between("resolvedAt", range)} GROUP BY 1`),
+  ]);
+  const createdBy = new Map(created.map((r) => [r.month, Number(r.n)]));
+  const slaBy = new Map(sla.map((r) => [r.month, pct(Number(r.inTime), Number(r.withDue))]));
+  return months.map((m) => ({ month: label(m), created: createdBy.get(label(m)) ?? 0, slaPercent: slaBy.get(label(m)) ?? null }));
 }

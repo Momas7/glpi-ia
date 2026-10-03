@@ -67,11 +67,14 @@ export async function getDashboard(
   const at = now ?? new Date();
   const tz = process.env.APP_TIMEZONE || "America/Sao_Paulo";
   const range = periodRange(period, at, tz);
-  const [kpis, dueSoon, workload, weekly, byCategory, slaByTeam, trend] = await Promise.all([
+  // Duas levas pequenas: as consultas de uma carga do painel não esgotam o pool de conexões (10 por padrão).
+  const [kpis, dueSoon, workload, weekly] = await Promise.all([
     queryKpis(scope, range, at),
     queryDueSoon(scope, at),
     queryWorkload(scope, at),
     queryWeekly(scope, range, tz),
+  ]);
+  const [byCategory, slaByTeam, trend] = await Promise.all([
     queryByCategory(scope, range),
     querySlaByTeam(scope, range),
     queryTrend(scope, monthStarts(at, tz, 6), tz),

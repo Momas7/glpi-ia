@@ -14,11 +14,21 @@ export interface KpiData {
   avgResolutionMinutes: number | null;
 }
 
+/** Com animação, o valor final fica no rótulo e a contagem é escondida de leitores de tela (que leriam 0, 3, 7…). */
 function Number_({ value, suffix = "", animate }: { value: number; suffix?: string; animate: boolean }) {
   return (
-    <span className="text-3xl font-semibold tabular-nums">
-      {animate ? <CountUp to={value} duration={1} /> : value}
-      {suffix}
+    <span className="text-3xl font-semibold tabular-nums" aria-label={`${value}${suffix}`}>
+      {animate ? (
+        <span aria-hidden="true">
+          <CountUp to={value} duration={1} />
+          {suffix}
+        </span>
+      ) : (
+        <>
+          {value}
+          {suffix}
+        </>
+      )}
     </span>
   );
 }
@@ -37,7 +47,7 @@ const timeText = (minutes: number | null) => (minutes === null ? "—" : formatB
 
 /** Cartões do topo. Números animados (React Bits), estáticos com prefers-reduced-motion; sem dado mostra "—". */
 export function KpiCards({ kpis }: { kpis: KpiData }) {
-  const animate = !usePrefersReducedMotion();
+  const animate = !usePrefersReducedMotion(false);
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6">
       <Card title="Abertos agora" hint={`${kpis.openUnassigned} sem responsável`}>

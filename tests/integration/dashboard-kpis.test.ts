@@ -66,12 +66,46 @@ describe("queryKpis", () => {
     expect(all.openNow).toBe(6);
   });
 
-  it("chamado reaberto e resolvido de novo conta uma vez (um só resolvedAt final)", async () => {
-    const before = await q.queryKpis({ teamIds: [ids.t1] }, OCTOBER, NOW);
-    await db.ticketEvent.create({
-      data: { ticketId: (await db.ticket.findFirstOrThrow({ where: { status: "RESOLVED", teamId: ids.t1 } })).id, actorId: ids.admin.id, type: "REOPENED", data: {} },
+  it("chamado reaberto sai das métricas de resolvidos e, resolvido de novo, volta uma vez só (pelas operações reais)", async () => {
+    const svc = await import("@/modules/tickets");
+    const sla = await import("@/modules/sla");
+    // calendário aberto 24 h × 7 dias e política MEDIUM: o prazo existe e cabe dentro do teste
+    await db.businessHours.deleteMany();
+    await db.businessHours.createMany({ data: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({ weekday, startMinute: 0, endMinute: 1440 })) });
+    await db.slaPolicy.deleteMany();
+    await db.slaPolicy.create({ data: { priority: "MEDIUM", firstResponseMinutes: 600, resolutionMinutes: 6000 } });
+    sla.invalidateCalendarCache();
+
+    const asSession = (u: { id: string; name: string; email: string; role: string }, teamIds: string[]) => ({
+      id: u.id, name: u.name, email: u.email, role: u.role as "REQUESTER" | "AGENT", teamIds,
     });
-    const after = await q.queryKpis({ teamIds: [ids.t1] }, OCTOBER, NOW);
-    expect(after.slaPercent).toBe(before.slaPercent);
+    const requester = asSession(ids.requester, []);
+    const agent = asSession(ids.ana, [ids.t1]);
+    const created = await svc.createTicket(requester, { title: "Reabertura real", description: "d" });
+    await db.ticket.update({ where: { id: created.id }, data: { teamId: ids.t1 } });
+
+    const today = { from: new Date(Date.now() - 86_400_000), to: new Date(Date.now() + 86_400_000) };
+    const now = new Date();
+    const kpis = () => q.queryKpis({ teamIds: [ids.t1] }, today, now);
+    const base = await kpis(); // chamados do fixture + este (aberto)
+
+    await svc.changeStatus(agent, created.id, "OPEN");
+    await svc.changeStatus(agent, created.id, "RESOLVED");
+    const resolved = await kpis();
+    expect(resolved.slaPercent).toBe(100);
+    expect(resolved.openNow).toBe(base.openNow - 1);
+
+    await svc.reopenTicket(requester, created.id, "Voltou a falhar de novo");
+    const reopened = await kpis();
+    expect(reopened.slaPercent).toBeNull(); // reaberto não conta como resolvido
+    expect(reopened.openNow).toBe(base.openNow);
+
+    await svc.changeStatus(agent, created.id, "RESOLVED");
+    const again = await kpis();
+    expect(again.slaPercent).toBe(100);
+    expect(again.openNow).toBe(base.openNow - 1);
+    const row = await db.ticket.findUniqueOrThrow({ where: { id: created.id } });
+    expect(again.avgResolutionMinutes).toBe(row.resolutionBusinessMinutes);
+    expect(await db.ticket.count({ where: { id: created.id, resolvedAt: { not: null } } })).toBe(1);
   });
 });

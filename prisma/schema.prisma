@@ -189,6 +189,8 @@ model Ticket {
 
   @@index([status, teamId, assigneeId])
   @@index([createdAt])
+  @@index([resolvedAt])
+  @@index([firstRespondedAt])
   @@index([requesterId])
   @@unique([apiKeyId, externalRef])
 }
