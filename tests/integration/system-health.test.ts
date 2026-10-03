@@ -149,11 +149,11 @@ describe("GET /api/health/ready", () => {
   it("200 com status ok quando tudo está saudável e 503 quando o worker não bate", async () => {
     const { GET } = await import("@/app/api/health/ready/route");
     await system.recordHeartbeat("worker", db);
-    const ok = await GET();
+    const ok = await GET(new Request("http://app.test/api/health/ready"));
     expect(ok.status).toBe(200);
     expect((await ok.json()).status).toBe("ok");
     await db.workerHeartbeat.deleteMany();
-    const bad = await GET();
+    const bad = await GET(new Request("http://app.test/api/health/ready"));
     expect(bad.status).toBe(503);
     const body = await bad.json();
     expect(body.status).toBe("degraded");

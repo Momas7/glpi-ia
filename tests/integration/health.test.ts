@@ -19,7 +19,7 @@ beforeEach(() => {
 async function callHealth(databaseUrl: string) {
   process.env.DATABASE_URL = databaseUrl;
   const { GET } = await import("@/app/api/health/route");
-  const res = await GET();
+  const res = await GET(new Request("http://app.test/api/health"));
   return { status: res.status, body: await res.json() };
 }
 
