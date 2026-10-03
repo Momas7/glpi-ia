@@ -83,7 +83,7 @@ describe("runAi", () => {
       if (++calls < 3) throw new AiError("429", true);
       return { answer: "ok" };
     });
-    const sleep = vi.fn(async () => {});
+    const sleep = vi.fn(async (_ms: number) => {});
     const out = await run.runAi(request(), deps({ provider, sleep }));
     expect(out.outcome).toBe("OK");
     expect(sleep.mock.calls.map((c) => c[0])).toEqual([1000, 2000]);
