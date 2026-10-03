@@ -140,3 +140,12 @@ describe("can: ações da gestão (Fase 2.1)", () => {
     for (const u of [agent, lead, requester]) expect(can(u, "admin:manage")).toBe(false);
   });
 });
+
+describe("can: dashboard:view", () => {
+  it("só gestor de equipe e admin", () => {
+    expect(can(user("TEAM_LEAD"), "dashboard:view")).toBe(true);
+    expect(can(user("ADMIN"), "dashboard:view")).toBe(true);
+    expect(can(user("AGENT"), "dashboard:view")).toBe(false);
+    expect(can(user("REQUESTER"), "dashboard:view")).toBe(false);
+  });
+});
