@@ -20,3 +20,6 @@ export { evaluateTriage, type EvalCase, type EvalReport } from "./eval";
 export { runEmbed, type EmbedDeps, type EmbedRequest, type EmbedResult } from "./embedding/run";
 export { getEmbeddingProvider } from "./embedding/factory";
 export { EMBEDDING_DIMENSIONS, type EmbeddingProvider } from "./embedding/types";
+export { chunkText, contentHash } from "./chunking";
+export { indexArticle, indexTicket, reindexAll, ticketKnowledgeText, toVectorLiteral, type IndexDeps, type IndexResult } from "./indexing";
+export { AI_INDEX_ARTICLE_QUEUE, AI_INDEX_TICKET_QUEUE, AI_REINDEX_QUEUE } from "./enqueue";

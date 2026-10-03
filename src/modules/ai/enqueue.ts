@@ -11,3 +11,19 @@ export async function enqueueTriage(tx: PrismaTransaction, ticketId: string): Pr
   if (process.env.AI_ENABLED !== "true") return;
   await enqueue(AI_TRIAGE_QUEUE, { ticketId }, { tx });
 }
+
+export const AI_INDEX_ARTICLE_QUEUE = "ai.index_article";
+export const AI_INDEX_TICKET_QUEUE = "ai.index_ticket";
+export const AI_REINDEX_QUEUE = "ai.reindex_all";
+
+/** Reindexa o artigo na transação que o altera. Sem IA ligada nada é enfileirado ("Reindexar tudo" cobre depois). */
+export async function enqueueIndexArticle(tx: PrismaTransaction, articleId: string): Promise<void> {
+  if (process.env.AI_ENABLED !== "true") return;
+  await enqueue(AI_INDEX_ARTICLE_QUEUE, { articleId }, { tx });
+}
+
+/** Reindexa (ou remove do índice) o chamado na transação que resolve, reabre ou avalia. */
+export async function enqueueIndexTicket(tx: PrismaTransaction, ticketId: string): Promise<void> {
+  if (process.env.AI_ENABLED !== "true") return;
+  await enqueue(AI_INDEX_TICKET_QUEUE, { ticketId }, { tx });
+}
