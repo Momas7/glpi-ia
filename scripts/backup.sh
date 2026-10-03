@@ -50,18 +50,18 @@ apply_retention() {
 count_all() {
   local t n
   for t in $COUNT_TABLES; do
-    n="$(psql_in "$PG_CONTAINER" "$PG_USER" "$PG_DB" "SELECT count(*) FROM \"$t\"" 2>/dev/null)" || return 1
+    n="$(psql_in "$PG_CONTAINER" "$PG_USER" "$PG_DB" "SELECT count(*) FROM \"$t\"" 2>"$BACKUP_DIR/.count.err")" || return 1
     printf '%s ' "$n"
   done
 }
-before="$(count_all)" || fail "não foi possível contar as tabelas antes do dump"
+before="$(count_all)" || fail "não foi possível contar as tabelas antes do dump ($(head -c 200 "$BACKUP_DIR/.count.err" 2>/dev/null | tr '\n' ' '))"
 
 log "dump do banco $PG_DB ($PG_CONTAINER)"
 "$RUNTIME" exec "$PG_CONTAINER" pg_dump -U "$PG_USER" -d "$PG_DB" -Fc > "$dump.partial" 2>"$BACKUP_DIR/.pg_dump.err" || fail "pg_dump falhou: $(head -c 200 "$BACKUP_DIR/.pg_dump.err" 2>/dev/null | tr '\n' ' ')"
-rm -f "$BACKUP_DIR/.pg_dump.err"
+rm -f "$BACKUP_DIR/.pg_dump.err" "$BACKUP_DIR/.count.err"
 [ -s "$dump.partial" ] || fail "o dump saiu vazio"
 "$RUNTIME" exec -i "$PG_CONTAINER" pg_restore --list < "$dump.partial" >/dev/null 2>&1 || fail "o dump não pôde ser lido de volta (pg_restore --list)"
-after="$(count_all)" || fail "não foi possível contar as tabelas depois do dump"
+after="$(count_all)" || fail "não foi possível contar as tabelas depois do dump ($(head -c 200 "$BACKUP_DIR/.count.err" 2>/dev/null | tr '\n' ' '))"
 {
   i=0
   read -ra b <<< "$before"; read -ra a <<< "$after"
