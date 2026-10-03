@@ -1,0 +1,24 @@
+# Produção local: HTTPS com certificado do próprio Caddy ("tls internal"), só em localhost.
+{
+	local_certs
+	# A porta publicada no host (8443/8080) não é a 80/443 de dentro do contêiner: um redirecionamento automático iria
+	# para a porta errada.
+	auto_https disable_redirects
+}
+
+localhost:443 {
+	tls internal
+	encode zstd gzip
+
+	# Sem HSTS de propósito: ele vale para o host "localhost" inteiro (qualquer porta) e
+	# forçaria https em todos os outros projetos locais do navegador.
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	reverse_proxy web:3000
+}

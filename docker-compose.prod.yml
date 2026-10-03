@@ -1,0 +1,108 @@
+# Produção local (uma máquina só): Caddy com HTTPS interno na frente do web; worker e Postgres em rede interna.
+# Uso: scripts/prod-init.sh && podman-compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+name: chamados
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql://glpi:${POSTGRES_PASSWORD:?rode scripts/prod-init.sh e use --env-file .env.prod}@postgres:5432/glpi_ia
+  SESSION_SECRET: ${SESSION_SECRET:?rode scripts/prod-init.sh e use --env-file .env.prod}
+  APP_URL: ${APP_URL:-https://localhost:${HTTPS_PORT:-8443}}
+  UPLOAD_DIR: /data/uploads
+  TRUSTED_PROXY_HOPS: "1"
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  AI_ENABLED: ${AI_ENABLED:-false}
+  LLM_PROVIDER: ${LLM_PROVIDER:-fake}
+  EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-fake}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  AI_DAILY_BUDGET: ${AI_DAILY_BUDGET:-5}
+  AI_TRIAGE_MIN_CONFIDENCE: ${AI_TRIAGE_MIN_CONFIDENCE:-0.6}
+  AI_RAG_MIN_SIMILARITY: ${AI_RAG_MIN_SIMILARITY:-0.6}
+  AI_DUPLICATE_MIN_SIMILARITY: ${AI_DUPLICATE_MIN_SIMILARITY:-0.85}
+  AI_INCIDENT_MIN_SIMILARITY: ${AI_INCIDENT_MIN_SIMILARITY:-0.75}
+  AI_INCIDENT_MIN_TICKETS: ${AI_INCIDENT_MIN_TICKETS:-5}
+  N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
+  N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:-}
+
+services:
+  postgres:
+    image: docker.io/pgvector/pgvector:pg16
+    restart: unless-stopped
+    mem_limit: 1g
+    logging: *logging
+    environment:
+      POSTGRES_USER: glpi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?rode scripts/prod-init.sh e use --env-file .env.prod}
+      POSTGRES_DB: glpi_ia
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glpi -d glpi_ia"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    mem_limit: 768m
+    logging: *logging
+    environment:
+      <<: *app-env
+      BACKUP_STATE_FILE: /backups/estado-backup.json
+    volumes:
+      - uploads:/data/uploads
+      - ${BACKUP_DIR:-./backups}:/backups:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  worker:
+    build:
+      context: .
+      target: worker
+    restart: unless-stopped
+    mem_limit: 512m
+    logging: *logging
+    environment:
+      <<: *app-env
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      web:
+        condition: service_healthy
+
+  caddy:
+    image: docker.io/library/caddy:2
+    restart: unless-stopped
+    mem_limit: 128m
+    logging: *logging
+    ports:
+      - "127.0.0.1:${HTTPS_PORT:-8443}:443"
+      - "127.0.0.1:${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:
+  caddy_config:
