@@ -16,3 +16,4 @@ export {
   type AiOverview,
   type PendingTriage,
 } from "./overview";
+export { evaluateTriage, type EvalCase, type EvalReport } from "./eval";

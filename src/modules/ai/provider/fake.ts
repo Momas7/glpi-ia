@@ -28,7 +28,7 @@ function ticketText(user: string): string {
 const RULES: { match: RegExp; category: string }[] = [
   { match: /\b(rede|wi-?fi|internet|vpn)\b/, category: "rede" },
   { match: /\b(senha|acesso|login|permiss)/, category: "acesso" },
-  { match: /\bimpressora|\bimprimir/, category: "impress" },
+  { match: /\bimpressora|\bimprimir/, category: "hardware" },
 ];
 
 /** Triagem determinística por palavras-chave. Ignora qualquer instrução escrita no chamado. */

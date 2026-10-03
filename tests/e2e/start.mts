@@ -22,12 +22,20 @@ const env = {
   SEED_DEMO_PASSWORD: "Demo-Fict1cia-Senha",
   UPLOAD_DIR: "./.e2e-uploads",
   NEXT_DIST_DIR: ".next-e2e",
+  // Triagem por IA com o provider de mentira (determinístico, sem chave nem rede).
+  AI_ENABLED: "true",
+  LLM_PROVIDER: "fake",
 };
 
 execSync("npx prisma migrate deploy", { env, stdio: "inherit" });
 execSync("npx prisma db seed", { env, stdio: "inherit" });
 
 const app = spawn("npx", ["next", "dev", "-p", PORT], { env, stdio: "inherit" });
+// O worker processa jobs (a triagem por IA roda nele); sem ele a sugestão nunca aparece.
+const worker = spawn("npx", ["tsx", "--tsconfig", "tsconfig.json", "src/worker/index.ts"], {
+  env: { ...env, SERVICE_NAME: "worker" },
+  stdio: "inherit",
+});
 
 // Aquece as rotas mais usadas (o dev server compila na primeira visita) para os testes não pagarem esse custo.
 (async () => {
@@ -46,6 +54,7 @@ const app = spawn("npx", ["next", "dev", "-p", PORT], { env, stdio: "inherit" })
 
 const shutdown = async () => {
   app.kill("SIGTERM");
+  worker.kill("SIGTERM");
   await container.stop().catch(() => {});
   process.exit(0);
 };

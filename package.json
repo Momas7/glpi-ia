@@ -15,6 +15,7 @@
     "db:seed": "prisma db seed",
     "worker": "SERVICE_NAME=worker tsx --env-file-if-exists=.env --tsconfig tsconfig.json src/worker/index.ts",
     "test:e2e": "playwright test",
+    "ai:eval": "tsx --env-file-if-exists=.env scripts/ai-eval.mts",
     "admin:create": "tsx --env-file-if-exists=.env scripts/create-admin.mts"
   },
   "dependencies": {

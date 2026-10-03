@@ -15,6 +15,7 @@ const prompt = (ticket: string) =>
     "CATEGORIAS:",
     "- cat-rede | Rede | team-infra",
     "- cat-acesso | Acessos | team-n1",
+    "- cat-hw | Hardware | team-infra",
     "- cat-outros | Outros | -",
     "",
     "EQUIPES:",
@@ -35,6 +36,10 @@ describe("FakeLLMProvider", () => {
     const { data, usage } = await run("O Wi-Fi caiu no 2º andar");
     expect(data).toEqual({ categoryId: "cat-rede", priority: "MEDIUM", teamId: "team-infra", confidence: 0.9 });
     expect(usage.inputTokens).toBeGreaterThan(0);
+  });
+
+  it("problema de impressora vai para Hardware", async () => {
+    expect((await run("A impressora do financeiro não imprime")).data.categoryId).toBe("cat-hw");
   });
 
   it("marca prioridade alta quando o texto diz urgente", async () => {
