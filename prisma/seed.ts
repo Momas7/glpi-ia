@@ -1,7 +1,9 @@
+import type { Prisma } from "../src/generated/prisma/client";
 import { createDb, type Db } from "../src/lib/db";
 import { hashPassword } from "../src/modules/auth/password";
 import { nationalHolidays } from "../src/modules/sla/holidays";
 import { addBusinessMinutes } from "../src/modules/sla/calendar";
+import { estimateCostUsd } from "../src/modules/ai/pricing";
 import { invalidateCalendarCache, loadCalendar, slaOnCreate } from "../src/modules/sla/service";
 
 // Dados 100% fictícios. Nada aqui vem de uma empresa real.
@@ -245,6 +247,7 @@ async function seedDemo(db: Db, teamIds: Map<string, string>): Promise<void> {
   }
   void admin;
   await seedHistory(db, { agentId: agent.id, requesterId: requester.id });
+  await seedAiDemo(db);
 }
 
 const SLA_POLICIES = [
@@ -285,4 +288,155 @@ if (process.argv[1]?.endsWith("seed.ts")) {
     console.error(err);
     process.exit(1);
   });
+}
+
+// ---- IA de demonstração: números fictícios, sempre marcados com `demo = true` ----
+
+const RATING_COMMENTS = [
+  "Atendimento rápido e claro.",
+  "Resolveram no mesmo dia, obrigado.",
+  "Demorou um pouco, mas deu certo.",
+  "Muito educado e objetivo.",
+  "Precisei repetir a explicação duas vezes.",
+  "Ótima comunicação durante o chamado.",
+];
+
+const INCIDENT_TITLES = ["Queda geral de internet (demonstração)", "Sistema de ponto fora do ar (demonstração)"];
+
+/** Escolhe um item de uma lista de pesos acumulados com um número de 0 a 1. */
+function pick<T>(r: number, options: [T, number][]): T {
+  let acc = 0;
+  for (const [value, weight] of options) {
+    acc += weight;
+    if (r < acc) return value;
+  }
+  return options[options.length - 1][0];
+}
+
+/**
+ * Histórico fictício de IA para o painel de métricas ter o que mostrar: sugestões de triagem, avaliações, duplicados,
+ * resumos, incidentes encerrados e execuções de IA ao longo de 6 meses. Idempotente (não faz nada se já existir
+ * linha de demonstração), determinístico e sempre `demo = true`. Nada aqui é uso real.
+ */
+export async function seedAiDemo(db: Db): Promise<void> {
+  if ((await db.aiAuditLog.count({ where: { demo: true } })) > 0) return;
+  const history = await db.ticket.findMany({
+    where: { title: { startsWith: "Histórico " } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, number: true, status: true, createdAt: true, closedAt: true, resolvedAt: true, requesterId: true, assigneeId: true, categoryId: true, teamId: true, priority: true },
+  });
+  if (history.length === 0) return;
+
+  const MIN = 60_000;
+  const logs: Prisma.AiAuditLogCreateManyInput[] = [];
+  const log = (r: () => number, ticketId: string, at: Date, jobType: string, model: string, inRange: [number, number], outRange: [number, number]) => {
+    const roll = r();
+    const outcome = roll < 0.96 ? "OK" : roll < 0.99 ? "FAILED" : "BUDGET";
+    const inputTokens = outcome === "BUDGET" ? 0 : Math.round(inRange[0] + r() * (inRange[1] - inRange[0]));
+    const outputTokens = outcome === "OK" ? Math.round(outRange[0] + r() * (outRange[1] - outRange[0])) : 0;
+    logs.push({
+      createdAt: at,
+      provider: model.startsWith("claude") ? "anthropic" : "gemini",
+      model,
+      jobType,
+      ticketId,
+      inputTokens: outcome === "OK" ? inputTokens : 0,
+      outputTokens,
+      costUsd: outcome === "OK" ? estimateCostUsd(model, inputTokens, outputTokens).toFixed(6) : "0",
+      latencyMs: outcome === "BUDGET" ? 0 : Math.round(600 - 500 * Math.log(1 - r() * 0.999)),
+      inputHash: `demo-${ticketId}-${jobType}`,
+      outcome,
+      error: outcome === "FAILED" ? "erro temporário do provedor (demonstração)" : null,
+      demo: true,
+    });
+  };
+
+  const suggestions: Prisma.AiSuggestionCreateManyInput[] = [];
+  const ratings: Prisma.TicketRatingCreateManyInput[] = [];
+
+  for (const [i, t] of history.entries()) {
+    const r = rng(5000 + i);
+    const decidedAt = new Date(t.createdAt.getTime() + (3 + Math.floor(r() * 90)) * MIN);
+    const status = pick(r(), [["ACCEPTED", 0.7], ["EDITED", 0.15], ["REJECTED", 0.15]] as ["ACCEPTED" | "EDITED" | "REJECTED", number][]);
+    suggestions.push({
+      ticketId: t.id,
+      kind: "TRIAGE",
+      payload: { categoryId: t.categoryId, priority: t.priority, teamId: t.teamId, basis: { categoryId: null, priority: "MEDIUM", teamId: t.teamId } } as Prisma.InputJsonValue,
+      confidence: Math.round((0.6 + r() * 0.38) * 100) / 100,
+      status,
+      decidedById: t.assigneeId,
+      decidedAt,
+      createdAt: new Date(t.createdAt.getTime() + MIN),
+      demo: true,
+    });
+    if (r() < 0.1) {
+      suggestions.push({
+        ticketId: t.id,
+        kind: "DUPLICATE",
+        payload: { candidates: [] },
+        confidence: Math.round((0.86 + r() * 0.12) * 100) / 100,
+        status: r() < 0.4 ? "REJECTED" : "ACCEPTED",
+        decidedById: t.assigneeId,
+        decidedAt,
+        createdAt: new Date(t.createdAt.getTime() + 2 * MIN),
+        demo: true,
+      });
+    }
+    if (r() < 0.07) {
+      suggestions.push({
+        ticketId: t.id,
+        kind: "SUMMARY",
+        payload: { text: "Resumo fictício da conversa (demonstração).", commentCount: 4, lastCommentId: "demo" },
+        confidence: 1,
+        status: "ACCEPTED",
+        decidedById: t.assigneeId,
+        decidedAt,
+        createdAt: new Date(t.createdAt.getTime() + 30 * MIN),
+        demo: true,
+      });
+    }
+    if (t.status === "CLOSED" && t.closedAt && r() < 0.55) {
+      const stars = pick(r(), [[5, 0.5], [4, 0.3], [3, 0.12], [2, 0.05], [1, 0.03]] as [number, number][]);
+      ratings.push({
+        ticketId: t.id,
+        raterId: t.requesterId,
+        stars,
+        comment: r() < 0.4 ? RATING_COMMENTS[Math.floor(r() * RATING_COMMENTS.length)] : null,
+        createdAt: new Date(t.closedAt.getTime() + (1 + Math.floor(r() * 20)) * 60 * MIN),
+        demo: true,
+      });
+    }
+
+    log(r, t.id, new Date(t.createdAt.getTime() + MIN), "triage", "gemini-3.8-flash", [600, 900], [80, 150]);
+    log(r, t.id, new Date(t.createdAt.getTime() + MIN), "embed", "gemini-embedding-001", [250, 500], [0, 0]);
+    log(r, t.id, new Date(t.createdAt.getTime() + 2 * MIN), "detect", "gemini-embedding-001", [250, 500], [0, 0]);
+    if (r() < 0.15) {
+      log(r, t.id, new Date(t.createdAt.getTime() + 40 * MIN), "search", "gemini-embedding-001", [200, 400], [0, 0]);
+      log(r, t.id, new Date(t.createdAt.getTime() + 41 * MIN), "draft", "claude-sonnet-5-5", [1500, 2500], [200, 400]);
+    }
+    if (r() < 0.04) log(r, t.id, new Date(t.createdAt.getTime() + 30 * MIN), "summary", "claude-sonnet-5-5", [900, 1800], [120, 260]);
+  }
+  // Garante todos os tipos de tarefa mesmo em históricos pequenos.
+  const first = history[0];
+  for (const [jobType, model] of [["draft", "claude-sonnet-5-5"], ["summary", "claude-sonnet-5-5"], ["search", "gemini-embedding-001"]] as const) {
+    if (!logs.some((l) => l.jobType === jobType)) {
+      log(rng(9000), first.id, new Date(first.createdAt.getTime() + 50 * MIN), jobType, model, [800, 1200], [100, 200]);
+    }
+  }
+
+  await db.aiSuggestion.createMany({ data: suggestions });
+  await db.ticketRating.createMany({ data: ratings });
+  await db.aiAuditLog.createMany({ data: logs });
+
+  // Dois incidentes encerrados, com cinco chamados do histórico cada.
+  const closed = history.filter((t) => t.status === "CLOSED" && t.closedAt);
+  for (const [g, title] of INCIDENT_TITLES.entries()) {
+    const members = closed.slice(g * 40, g * 40 + 5);
+    if (members.length < 5) continue;
+    const detectedAt = members[0].createdAt;
+    const group = await db.incidentGroup.create({
+      data: { title, status: "CLOSED", detectedAt, closedAt: new Date(detectedAt.getTime() + 6 * 60 * MIN) },
+    });
+    await db.ticket.updateMany({ where: { id: { in: members.map((m) => m.id) } }, data: { incidentGroupId: group.id } });
+  }
 }
