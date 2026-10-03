@@ -78,7 +78,12 @@ Antes de atualizar rode `npm run backup`. Para voltar: `git checkout <versão an
 
 - `chamados-AAAAMMDD-HHMMSS.dump`: o banco inteiro, com os vetores (formato comprimido do `pg_dump`);
 - `chamados-AAAAMMDD-HHMMSS-anexos.tar.gz`: os anexos;
+- `chamados-AAAAMMDD-HHMMSS.counts`: contagens das tabelas na hora do dump (o teste de restauração confere contra elas, não contra o banco vivo);
 - `estado-backup.json`: o que a página de saúde lê (último backup e último teste de restauração).
+
+O backup **falha** (em vez de gravar um arquivo de anexos vazio) se não achar a pasta (`UPLOADS_DIR`) nem o volume (`UPLOADS_VOLUME`, padrão `chamados_uploads`); se de fato não existe anexo nenhum, rode com `ALLOW_EMPTY_ATTACHMENTS=1`. Backup e teste usam uma trava (`.lock` na pasta de backup): nunca rodam ao mesmo tempo.
+
+Os scripts de backup assumem os nomes do Podman (`chamados_postgres_1`); com Docker Compose os nomes levam hífen: `RUNTIME=docker PG_CONTAINER=chamados-postgres-1 UPLOADS_VOLUME=chamados_uploads npm run backup`.
 
 Retenção: os 14 mais recentes mais um por semana (até 8 semanas). Se o backup falhar, os antigos **não** são apagados e a página de saúde mostra o erro.
 
@@ -100,19 +105,20 @@ O backup roda todo dia às 2h e o teste de restauração aos domingos às 3h30 (
 
 ## 5. Restauração
 
-O **teste de restauração** (`npm run restore:test`) não mexe no seu banco: sobe um Postgres descartável, restaura o último backup, confere as contagens (usuários, chamados, comentários, artigos, vetores, migrações) e os anexos, remove o contêiner e grava o resultado. Backup que nunca foi restaurado não conta como backup.
+O **teste de restauração** (`npm run restore:test`) não mexe no seu banco: sobe um Postgres descartável, restaura o último backup, confere as contagens da hora do dump (usuários, chamados, comentários, artigos, vetores, anexos, migrações) e se todo anexo registrado no banco está no arquivo de anexos, remove o contêiner e grava o resultado. Backup que nunca foi restaurado não conta como backup.
 
 Para restaurar de verdade (substitui o banco atual):
 
 ```bash
-npm run prod:down                                     # pare o web e o worker
-podman start chamados_postgres_1                      # só o banco precisa estar de pé
+podman stop chamados_web_1 chamados_worker_1 chamados_caddy_1   # só o banco fica de pé
 bash scripts/restore.sh                               # lista os backups
 bash scripts/restore.sh backups/chamados-AAAAMMDD-HHMMSS.dump backups/chamados-AAAAMMDD-HHMMSS-anexos.tar.gz
 npm run prod:up
 ```
 
-O script pede para você digitar `restaurar` antes de tocar no banco (ou use `--yes` em automações).
+O script pede para você digitar `restaurar` antes de tocar no banco (ou use `--yes` em automações). A restauração roda numa única transação: se falhar no meio, o banco continua como estava.
+
+Cuidado com versões: o dump traz o esquema da versão que o gerou. Se você já atualizou o código para uma versão com migrações novas, restaure com a versão do código do backup (`git checkout`) e só depois suba a versão nova, que aplica as migrações sozinha.
 
 ## 6. Quando algo falha
 

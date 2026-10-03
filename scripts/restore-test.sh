@@ -5,6 +5,7 @@ set -euo pipefail
 # shellcheck source=lib/ops-common.sh
 source "$(dirname "$0")/lib/ops-common.sh"
 
+acquire_lock
 dump="$(latest_dump)"
 [ -n "$dump" ] || { echo "nenhum backup encontrado em $BACKUP_DIR: rode scripts/backup.sh primeiro." >&2; exit 1; }
 attachments="${dump%.dump}-anexos.tar.gz"
@@ -33,22 +34,27 @@ log "restaurando $(basename "$dump")"
 "$RUNTIME" exec -i "$scratch" pg_restore -U postgres -d restore_test --no-owner --no-privileges --exit-on-error < "$dump" >/dev/null 2>&1 \
   || restore_test_fail "o pg_restore falhou (backup corrompido ou incompleto)"
 
-for table in User Ticket Comment KbArticle KbChunk TicketEmbedding _prisma_migrations; do
+counts="${dump%.dump}.counts"
+[ -f "$counts" ] || restore_test_fail "contagens da hora do backup ausentes ($(basename "$counts"))"
+while read -r table before after; do
   restored="$(psql_in "$scratch" postgres restore_test "SELECT count(*) FROM \"$table\"" 2>/dev/null)" || restore_test_fail "tabela $table ausente no backup restaurado"
-  live="$(psql_in "$PG_CONTAINER" "$PG_USER" "$PG_DB" "SELECT count(*) FROM \"$table\"" 2>/dev/null)" || restore_test_fail "não foi possível contar $table no banco vivo"
-  if [ "$table" = "_prisma_migrations" ]; then
-    [ "$restored" -eq "$live" ] || restore_test_fail "migrações diferentes (backup $restored, banco $live)"
-  elif [ "$restored" -gt "$live" ]; then
-    restore_test_fail "$table tem mais linhas no backup ($restored) do que no banco vivo ($live)"
+  lo=$(( before < after ? before : after )); hi=$(( before > after ? before : after ))
+  if [ "$restored" -lt "$lo" ] || [ "$restored" -gt "$hi" ]; then
+    restore_test_fail "$table: o backup restaurado tem $restored linhas, esperado entre $lo e $hi (contagem da hora do dump)"
   fi
-  log "$table: backup=$restored vivo=$live"
-done
+  log "$table: restaurado=$restored (dump: $lo a $hi)"
+done < "$counts"
 
-if [ -f "$attachments" ]; then
-  tar tzf "$attachments" >/dev/null 2>&1 || restore_test_fail "o arquivo de anexos está corrompido"
-else
-  restore_test_fail "arquivo de anexos do backup não encontrado"
-fi
+[ -f "$attachments" ] || restore_test_fail "arquivo de anexos do backup não encontrado"
+listing="$(mktemp)"
+tar tzf "$attachments" 2>/dev/null | sed 's|^\./||' > "$listing" || { rm -f "$listing"; restore_test_fail "o arquivo de anexos está corrompido"; }
+missing=0
+while IFS= read -r stored; do
+  [ -n "$stored" ] || continue
+  grep -qxF -- "$stored" "$listing" || missing=$((missing + 1))
+done < <(psql_in "$scratch" postgres restore_test 'SELECT "storedName" FROM "Attachment"')
+rm -f "$listing"
+[ "$missing" -eq 0 ] || restore_test_fail "$missing anexo(s) registrados no banco não estão no arquivo de anexos"
 
 write_state "lastRestoreTestAt=$(json_str "$(now_iso)")" "lastRestoreTestOk=true"
 log "teste de restauração OK ($(basename "$dump"))"

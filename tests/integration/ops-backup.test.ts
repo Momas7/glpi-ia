@@ -89,6 +89,27 @@ describe("backup.sh", () => {
     expect(readdirSync(backupDir).some((f) => f.endsWith(".partial"))).toBe(false);
   });
 
+  it("sem pasta nem volume de anexos o backup falha (não grava tar vazio) e não deixa dump solto", () => {
+    const r = run("scripts/backup.sh", [], { UPLOADS_DIR: join(uploadsDir, "nao-existe"), UPLOADS_VOLUME: "volume-que-nao-existe-xyz" });
+    expect(r.status).not.toBe(0);
+    expect(dumps()).toEqual([]);
+    expect(readdirSync(backupDir).filter((f) => f.endsWith("-anexos.tar.gz") || f.endsWith(".partial"))).toEqual([]);
+    expect(state().lastBackupOk).toBe(false);
+  });
+
+  it("anexos vazios só passam com ALLOW_EMPTY_ATTACHMENTS=1", () => {
+    const r = run("scripts/backup.sh", [], { UPLOADS_DIR: join(uploadsDir, "nao-existe"), UPLOADS_VOLUME: "volume-que-nao-existe-xyz", ALLOW_EMPTY_ATTACHMENTS: "1" });
+    expect(r.status, r.stderr).toBe(0);
+  });
+
+  it("duas execuções ao mesmo tempo: a segunda espera a primeira (flock) e ambas terminam bem", () => {
+    const a = spawnSync("bash", ["-c", `bash scripts/backup.sh & bash scripts/backup.sh & wait`], { env: env(), encoding: "utf8", timeout: 180_000 });
+    expect(a.status, a.stderr).toBe(0);
+    expect(dumps().length).toBeGreaterThanOrEqual(1);
+    expect(readdirSync(backupDir).filter((f) => f.endsWith(".partial"))).toEqual([]);
+    expect(state().lastBackupOk).toBe(true);
+  });
+
   it("retenção: mantém os 14 mais recentes e no máximo um por semana dos mais antigos; apaga o tar pareado", () => {
     const day = 24 * 3600 * 1000;
     const fake: string[] = [];
@@ -122,6 +143,25 @@ describe("restore-test.sh", () => {
     expect(new Date(s!.lastRestoreTestAt!).getTime()).toBeGreaterThan(Date.now() - 120_000);
     const leftovers = execFileSync(RUNTIME, ["ps", "-a", "--filter", "name=chamados-restore-test", "--format", "{{.Names}}"], { encoding: "utf8" }).trim();
     expect(leftovers).toBe("");
+  });
+
+  it("compara com as contagens da hora do dump: mudanças no banco vivo depois do backup não reprovam o teste", async () => {
+    expect(run("scripts/backup.sh").status).toBe(0);
+    await db.ticket.deleteMany({ where: { title: "t2" } });
+    const r = run("scripts/restore-test.sh");
+    expect(r.status, r.stderr + r.stdout).toBe(0);
+  });
+
+  it("reprova quando um anexo registrado no banco não está no tar", async () => {
+    const u = await db.user.findFirstOrThrow();
+    const t = await db.ticket.findFirstOrThrow();
+    await db.attachment.create({ data: { ticketId: t.id, uploaderId: u.id, filename: "x.txt", storedName: "ausente-do-tar.txt", mimeType: "text/plain", size: 3 } });
+    expect(run("scripts/backup.sh").status).toBe(0);
+    const r = run("scripts/restore-test.sh");
+    expect(r.status).not.toBe(0);
+    expect(state().lastRestoreTestOk).toBe(false);
+    expect(String(state().detail)).toMatch(/anexo/i);
+    await db.attachment.deleteMany();
   });
 
   it("dump corrompido: o teste falha, grava lastRestoreTestOk=false e sai com erro (e ainda limpa o contêiner)", () => {

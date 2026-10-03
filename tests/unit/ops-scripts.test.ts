@@ -40,6 +40,13 @@ describe("scripts de operação", () => {
     expect(test).toMatch(/lastRestoreTestOk|restore_test_ok/);
   });
 
+  it("backup, teste e restauração usam trava (flock); a restauração é transacional; o teste roda depois do backup", () => {
+    for (const path of scripts) expect(read(path), path).toMatch(/acquire_lock/);
+    expect(read("scripts/lib/ops-common.sh")).toMatch(/flock -w/);
+    expect(read("scripts/restore.sh")).toMatch(/--single-transaction/);
+    expect(read("deploy/systemd/chamados-restore-test.service")).toMatch(/After=chamados-backup\.service/);
+  });
+
   it("as unidades do systemd têm os horários combinados e Persistent=true", () => {
     expect(read("deploy/systemd/chamados-backup.timer")).toMatch(/OnCalendar=\*-\*-\* 02:00:00/);
     expect(read("deploy/systemd/chamados-restore-test.timer")).toMatch(/OnCalendar=Sun \*-\*-\* 03:30:00/);

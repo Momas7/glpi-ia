@@ -1,5 +1,6 @@
 [Unit]
 Description=Teste de restauração do último backup do Sistema de Chamados
+After=chamados-backup.service
 
 [Service]
 Type=oneshot

@@ -9,10 +9,12 @@ stamp="$(date +%Y%m%d-%H%M%S)"
 dump="$BACKUP_DIR/chamados-$stamp.dump"
 attachments="$BACKUP_DIR/chamados-$stamp-anexos.tar.gz"
 mkdir -p "$BACKUP_DIR"
+acquire_lock
+counts="$BACKUP_DIR/chamados-$stamp.counts"
 
 fail() {
   log "backup falhou: $1"
-  rm -f "$dump.partial" "$attachments.partial"
+  rm -f "$dump.partial" "$attachments.partial" "$counts.partial"
   write_state "lastBackupOk=false" "detail=$(json_str "$1")"
   exit 1
 }
@@ -32,33 +34,54 @@ apply_retention() {
   done
   for f in "${files[@]}"; do
     if ! printf '%s\n' "${keep[@]}" | grep -qxF "$f"; then
-      rm -f "$f" "${f%.dump}-anexos.tar.gz"
+      rm -f "$f" "${f%.dump}-anexos.tar.gz" "${f%.dump}.counts"
       log "removido pela retenção: $(basename "$f")"
     fi
   done
   # anexos sem dump correspondente também saem
-  for f in "$BACKUP_DIR"/chamados-*-anexos.tar.gz; do
+  for f in "$BACKUP_DIR"/chamados-*-anexos.tar.gz "$BACKUP_DIR"/chamados-*.counts; do
     [ -e "$f" ] || continue
-    [ -e "${f%-anexos.tar.gz}.dump" ] || rm -f "$f"
+    base="${f%-anexos.tar.gz}"; base="${base%.counts}"
+    [ -e "$base.dump" ] || rm -f "$f"
   done
 }
+
+# Contagens antes e depois do dump: o teste de restauração confere que o restaurado fica entre as duas.
+count_all() {
+  local t n
+  for t in $COUNT_TABLES; do
+    n="$(psql_in "$PG_CONTAINER" "$PG_USER" "$PG_DB" "SELECT count(*) FROM \"$t\"" 2>/dev/null)" || return 1
+    printf '%s ' "$n"
+  done
+}
+before="$(count_all)" || fail "não foi possível contar as tabelas antes do dump"
 
 log "dump do banco $PG_DB ($PG_CONTAINER)"
 "$RUNTIME" exec "$PG_CONTAINER" pg_dump -U "$PG_USER" -d "$PG_DB" -Fc > "$dump.partial" 2>"$BACKUP_DIR/.pg_dump.err" || fail "pg_dump falhou: $(head -c 200 "$BACKUP_DIR/.pg_dump.err" 2>/dev/null | tr '\n' ' ')"
 rm -f "$BACKUP_DIR/.pg_dump.err"
 [ -s "$dump.partial" ] || fail "o dump saiu vazio"
 "$RUNTIME" exec -i "$PG_CONTAINER" pg_restore --list < "$dump.partial" >/dev/null 2>&1 || fail "o dump não pôde ser lido de volta (pg_restore --list)"
-mv -f "$dump.partial" "$dump"
+after="$(count_all)" || fail "não foi possível contar as tabelas depois do dump"
+{
+  i=0
+  read -ra b <<< "$before"; read -ra a <<< "$after"
+  for t in $COUNT_TABLES; do printf '%s %s %s\n' "$t" "${b[$i]}" "${a[$i]}"; i=$((i + 1)); done
+} > "$counts.partial"
 
 log "anexos"
 if [ -n "$UPLOADS_DIR" ] && [ -d "$UPLOADS_DIR" ]; then
   tar czf "$attachments.partial" -C "$UPLOADS_DIR" . || fail "falha ao compactar os anexos"
 elif "$RUNTIME" volume inspect "$UPLOADS_VOLUME" >/dev/null 2>&1; then
   "$RUNTIME" run --rm --entrypoint tar -v "$UPLOADS_VOLUME":/data:ro "$PG_IMAGE" czf - -C /data . > "$attachments.partial" || fail "falha ao compactar o volume de anexos"
-else
+elif [ "${ALLOW_EMPTY_ATTACHMENTS:-0}" = 1 ]; then
   tar czf "$attachments.partial" -T /dev/null || fail "falha ao criar o arquivo de anexos vazio"
+else
+  fail "pasta de anexos (UPLOADS_DIR) e volume ($UPLOADS_VOLUME) não encontrados; confira o nome ou use ALLOW_EMPTY_ATTACHMENTS=1 se não há anexos"
 fi
+# O dump só ganha o nome final depois de tudo pronto: o .dump é o que marca um backup completo.
 mv -f "$attachments.partial" "$attachments"
+mv -f "$counts.partial" "$counts"
+mv -f "$dump.partial" "$dump"
 
 bytes=$(( $(stat -c %s "$dump") + $(stat -c %s "$attachments") ))
 apply_retention

@@ -81,6 +81,16 @@ write_state() {
 
 latest_dump() { { ls -1 "$BACKUP_DIR"/chamados-*.dump 2>/dev/null || true; } | sort | tail -1; }
 
+# Tabelas cujas contagens são registradas na hora do dump e conferidas no teste de restauração.
+COUNT_TABLES="User Ticket Comment KbArticle KbChunk TicketEmbedding Attachment _prisma_migrations"
+
+# Uma operação de backup/restauração por vez (o systemd pode disparar backup e teste ao mesmo tempo).
+acquire_lock() {
+  mkdir -p "$BACKUP_DIR"
+  exec 9>"$BACKUP_DIR/.lock"
+  flock -w 1800 9 || { log "outra operação de backup está em andamento; desisti depois de 30 min"; exit 1; }
+}
+
 psql_in() { # psql_in <contêiner> <usuário> <banco> <sql>
   "$RUNTIME" exec "$1" psql -U "$2" -d "$3" -Atc "$4"
 }

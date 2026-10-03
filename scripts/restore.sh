@@ -30,8 +30,9 @@ if [ "$assume_yes" -ne 1 ]; then
   [ "$answer" = "restaurar" ] || { echo "cancelado: nada foi alterado." >&2; exit 1; }
 fi
 
+acquire_lock
 log "restaurando $(basename "$dump")"
-"$RUNTIME" exec -i "$PG_CONTAINER" pg_restore -U "$PG_USER" -d "$PG_DB" --clean --if-exists --no-owner --no-privileges --exit-on-error < "$dump"
+"$RUNTIME" exec -i "$PG_CONTAINER" pg_restore -U "$PG_USER" -d "$PG_DB" --single-transaction --clean --if-exists --no-owner --no-privileges --exit-on-error < "$dump"
 
 if [ -n "$attachments" ]; then
   [ -f "$attachments" ] || { echo "anexos não encontrados: $attachments" >&2; exit 1; }
