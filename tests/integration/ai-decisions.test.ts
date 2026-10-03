@@ -162,6 +162,13 @@ describe("estado", () => {
     expect((await freshTicket(t.id)).teamId).toBe(teamN1);
   });
 
+  it("rejeitar funciona mesmo com a sugestão obsoleta (não toca no chamado)", async () => {
+    const t = await ticketWithSuggestion();
+    await db.ticket.update({ where: { id: t.id }, data: { priority: "LOW" } });
+    await ai.decideSuggestion(agent, t.id, { action: "reject" });
+    expect((await suggestion(t.id)).status).toBe("REJECTED");
+  });
+
   it("chamado já resolvido: 409", async () => {
     const t = await ticketWithSuggestion();
     await db.ticket.update({ where: { id: t.id }, data: { status: "RESOLVED" } });

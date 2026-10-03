@@ -10,8 +10,9 @@ const PRICES: { prefix: string; input: number; output: number }[] = [
 ];
 
 export function estimateCostUsd(model: string, inputTokens: number, outputTokens: number): number {
-  const price = PRICES.find((p) => model.startsWith(p.prefix));
-  if (!price) return 0;
+  if (model.startsWith("fake")) return 0;
+  // Modelo fora da tabela: cobra o preço mais alto conhecido, para o teto diário nunca ficar cego.
+  const price = PRICES.find((p) => model.startsWith(p.prefix)) ?? PRICES.reduce((a, b) => (b.output > a.output ? b : a));
   return (inputTokens * price.input + outputTokens * price.output) / 1_000_000;
 }
 

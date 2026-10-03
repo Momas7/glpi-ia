@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { can, type SessionUser } from "@/modules/auth";
 import { recordAudit } from "@/modules/audit";
+import { isSuggestionStale } from "./stale";
 import { applyTriageFields, getTicket, TicketNotFoundError, type TicketWithRefs } from "@/modules/tickets";
 
 const priorityEnum = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
@@ -44,15 +45,27 @@ export async function decideSuggestion(
   if (suggestion.status !== "PENDING") throw new AppError(409, "Esta sugestão já foi decidida.");
 
   const payload = suggestion.payload as unknown as TriagePayload;
-  const stale =
-    ticket.status === "RESOLVED" ||
-    ticket.status === "CLOSED" ||
-    ticket.categoryId !== payload.basis.categoryId ||
-    ticket.priority !== payload.basis.priority ||
-    ticket.teamId !== payload.basis.teamId;
-  if (stale) throw new AppError(409, "O chamado mudou desde a sugestão. Atualize a página.");
+  // Rejeitar não toca no chamado, então vale mesmo com a sugestão obsoleta (senão ela ficaria presa).
+  if (decision.action !== "reject" && isSuggestionStale(ticket, payload.basis)) {
+    throw new AppError(409, "O chamado mudou desde a sugestão. Atualize a página.");
+  }
 
   const claim = async (tx: Prisma.TransactionClient, fields: unknown) => {
+    if (fields) {
+      // Trava o chamado no estado em que a sugestão foi feita: uma edição manual que entrou depois da checagem
+      // acima faz o count ser 0 (409) e nada é sobrescrito; uma que chegar durante a transação espera por ela.
+      const locked = await tx.ticket.updateMany({
+        where: {
+          id: ticketId,
+          status: { notIn: ["RESOLVED", "CLOSED"] },
+          categoryId: payload.basis.categoryId,
+          priority: payload.basis.priority as TriagePayload["priority"],
+          teamId: payload.basis.teamId,
+        },
+        data: { updatedAt: new Date() },
+      });
+      if (locked.count !== 1) throw new AppError(409, "O chamado mudou desde a sugestão. Atualize a página.");
+    }
     const claimed = await tx.aiSuggestion.updateMany({
       where: { id: suggestion.id, status: "PENDING" },
       data: { status: STATUS_FOR[decision.action], decidedById: actor.id, decidedAt: new Date() },

@@ -29,6 +29,7 @@ const suggestion = {
   teamId: "t-infra",
   teamName: "Infraestrutura",
   confidence: 0.9,
+  current: { categoryId: "c-acessos", teamId: "t-n1" },
   options: {
     categories: [
       { id: "c-rede", name: "Rede" },
@@ -74,6 +75,15 @@ describe("AiSuggestionCard", () => {
     fireEvent.change(screen.getByLabelText("Categoria"), { target: { value: "c-acessos" } });
     fireEvent.change(screen.getByLabelText("Prioridade"), { target: { value: "LOW" } });
     fireEvent.change(screen.getByLabelText("Equipe"), { target: { value: "t-n1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(lastBody()).toEqual({ action: "edit", fields: { categoryId: "c-acessos", priority: "LOW", teamId: "t-n1" } });
+  });
+
+  it("Editar: sugestão sem categoria mantém a categoria atual do chamado, em vez de apagá-la", async () => {
+    render(<AiSuggestionCard ticketId="t1" suggestion={{ ...suggestion, categoryId: null, categoryName: null, teamId: null, teamName: null }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Editar" }));
+    fireEvent.change(screen.getByLabelText("Prioridade"), { target: { value: "LOW" } });
     fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(lastBody()).toEqual({ action: "edit", fields: { categoryId: "c-acessos", priority: "LOW", teamId: "t-n1" } });

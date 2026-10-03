@@ -16,6 +16,7 @@ export interface AiSuggestionView {
   teamId: string | null;
   teamName: string | null;
   confidence: number;
+  current: { categoryId: string | null; teamId: string | null };
   options: { categories: { id: string; name: string }[]; teams: { id: string; name: string }[] };
 }
 
@@ -23,9 +24,9 @@ export interface AiSuggestionView {
 export function AiSuggestionCard({ ticketId, suggestion }: { ticketId: string; suggestion: AiSuggestionView }) {
   const { run, error, pending } = useAction();
   const [editing, setEditing] = useState(false);
-  const [categoryId, setCategoryId] = useState(suggestion.categoryId ?? "");
+  const [categoryId, setCategoryId] = useState(suggestion.categoryId ?? suggestion.current.categoryId ?? "");
   const [priority, setPriority] = useState(suggestion.priority);
-  const [teamId, setTeamId] = useState(suggestion.teamId ?? "");
+  const [teamId, setTeamId] = useState(suggestion.teamId ?? suggestion.current.teamId ?? "");
   const url = `/api/tickets/${ticketId}/ai/triage`;
 
   return (
@@ -67,7 +68,7 @@ export function AiSuggestionCard({ ticketId, suggestion }: { ticketId: string; s
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="ai-team">Equipe</Label>
             <select id="ai-team" className={selectClass} value={teamId} onChange={(e) => setTeamId(e.target.value)}>
-              <option value="">Manter a atual</option>
+              <option value="">Sem equipe (manter a atual)</option>
               {suggestion.options.teams.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}

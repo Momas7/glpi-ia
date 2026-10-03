@@ -60,6 +60,25 @@ describe("mask: cartão e segredos", () => {
   });
 });
 
+describe("mask: formas comuns de senha e chave", () => {
+  it("'senha é X', 'senha nova é X' e 'senha Abc12345'", () => {
+    expect(mask("minha senha é Abc@12345").text).toBe("minha senha é [SEGREDO_1]");
+    expect(mask("a senha nova is Xy9!kLm2").text).toBe("a senha nova is [SEGREDO_1]");
+    expect(mask("senha Abc12345 por favor").text).toBe("senha [SEGREDO_1] por favor");
+  });
+  it("a palavra senha seguida de texto comum não é mascarada", () => {
+    expect(mask("Minha senha expirou ontem").text).toBe("Minha senha expirou ontem");
+    expect(mask("esqueci a senha do e-mail").text).toBe("esqueci a senha do e-mail");
+  });
+  it("JWT sem Bearer e chave AWS", () => {
+    expect(mask("token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.abcDEF123 fim").text).not.toContain("eyJhbGci");
+    expect(mask("chave AKIAIOSFODNN7EXAMPLE").text).toBe("chave [SEGREDO_1]");
+  });
+  it("e-mail com número de CPF no usuário vira um único token, sem vazar o domínio", () => {
+    expect(mask("52998224725@empresa.com").text).toBe("[EMAIL_1]");
+  });
+});
+
 describe("mask: sem falsos positivos", () => {
   it("números curtos e anos ficam como estão", () => {
     const t = "erro 504 na sala 12 em 2024 2025 2026, chamado 1500";

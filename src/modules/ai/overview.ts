@@ -8,6 +8,7 @@ import type { TicketWithRefs } from "@/modules/tickets";
 import { defaultTriageModel } from "./pricing";
 import { getLlmProvider } from "./provider/factory";
 import { startOfDay } from "./run";
+import { isSuggestionStale, type TriageBasis } from "./stale";
 
 export interface PendingTriage {
   id: string;
@@ -17,6 +18,8 @@ export interface PendingTriage {
   teamId: string | null;
   teamName: string | null;
   confidence: number;
+  /** Categoria e equipe do chamado agora: o editor parte delas quando a sugestão diz "manter". */
+  current: { categoryId: string | null; teamId: string | null };
   options: { categories: { id: string; name: string }[]; teams: { id: string; name: string }[] };
 }
 
@@ -24,6 +27,7 @@ interface TriagePayload {
   categoryId: string | null;
   priority: Priority;
   teamId: string | null;
+  basis: TriageBasis;
 }
 
 /** A sugestão pendente do chamado, só para quem pode decidi-la (nunca o solicitante). */
@@ -33,6 +37,7 @@ export async function getPendingTriage(actor: SessionUser, ticket: TicketWithRef
   const s = await db.aiSuggestion.findFirst({ where: { ticketId: ticket.id, kind: "TRIAGE", status: "PENDING" } });
   if (!s) return null;
   const payload = s.payload as unknown as TriagePayload;
+  if (isSuggestionStale(ticket, payload.basis)) return null;
   const [categories, teams] = await Promise.all([
     db.category.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     db.team.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -45,6 +50,7 @@ export async function getPendingTriage(actor: SessionUser, ticket: TicketWithRef
     teamId: payload.teamId,
     teamName: teams.find((t) => t.id === payload.teamId)?.name ?? null,
     confidence: s.confidence,
+    current: { categoryId: ticket.categoryId, teamId: ticket.teamId },
     options: { categories, teams },
   };
 }
@@ -55,9 +61,14 @@ export async function pendingTriageTicketIds(actor: SessionUser, tickets: Ticket
   if (decidable.length === 0) return new Set();
   const rows = await getDb().aiSuggestion.findMany({
     where: { ticketId: { in: decidable.map((t) => t.id) }, kind: "TRIAGE", status: "PENDING" },
-    select: { ticketId: true },
+    select: { ticketId: true, payload: true },
   });
-  return new Set(rows.map((r) => r.ticketId));
+  const byId = new Map(decidable.map((t) => [t.id, t]));
+  return new Set(
+    rows
+      .filter((r) => !isSuggestionStale(byId.get(r.ticketId)!, (r.payload as unknown as TriagePayload).basis))
+      .map((r) => r.ticketId),
+  );
 }
 
 type OverviewConfig = Pick<

@@ -80,6 +80,20 @@ describe("leitura da sugestão", () => {
     expect(await ai.getPendingTriage(agent, t)).toBeNull();
   });
 
+  it("sugestão obsoleta (chamado mudou ou foi resolvido) deixa de aparecer no cartão e no selo", async () => {
+    const t = await withSuggestion();
+    await db.ticket.update({ where: { id: t.id }, data: { priority: "LOW" } });
+    const changed = (await tickets.getTicket(agent, t.id))!;
+    expect(await ai.getPendingTriage(agent, changed)).toBeNull();
+    expect((await ai.pendingTriageTicketIds(agent, [changed])).size).toBe(0);
+  });
+
+  it("expõe a categoria e a equipe atuais do chamado para o cartão", async () => {
+    const t = await withSuggestion();
+    const s = await ai.getPendingTriage(agent, t);
+    expect(s!.current).toEqual({ categoryId: null, teamId: teamN1 });
+  });
+
   it("pendingTriageTicketIds devolve só os chamados pendentes e decidíveis", async () => {
     const a = await withSuggestion();
     const b = await tickets.createTicket(requester, { title: "Sem sugestão", description: "x" });

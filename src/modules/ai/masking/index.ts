@@ -86,14 +86,25 @@ export function mask(input: string): Masked {
     /\b(senha|password|passwd|pwd|token|secret|segredo|api[_-]?key)(\s*[:=]\s*)(\S+)/gi,
     (_m, key: string, sep: string, value: string) => `${key}${sep}${tokenFor("SEGREDO", value)}`,
   );
+  text = text.replace(
+    /\b(senha|password|passwd)((?:\s+(?:nova|atual|antiga))?\s+(?:é|eh|is)\s+)(\S+)/gi,
+    (_m, key: string, sep: string, value: string) => `${key}${sep}${tokenFor("SEGREDO", value)}`,
+  );
+  // "senha Abc12345": só quando a palavra seguinte parece uma senha (letras e números, 6+), para não mascarar "senha expirou".
+  text = text.replace(
+    /\b(senha|password|passwd)(\s+)(?=\S*\d)(?=\S*[A-Za-z])(\S{6,})/gi,
+    (_m, key: string, sep: string, value: string) => `${key}${sep}${tokenFor("SEGREDO", value)}`,
+  );
+  text = text.replace(/\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]*/g, (m) => tokenFor("SEGREDO", m));
+  text = text.replace(/\bAKIA[0-9A-Z]{16}\b/g, (m) => tokenFor("SEGREDO", m));
   text = text.replace(/\bBearer\s+([A-Za-z0-9._~+/=-]{8,})/g, (_m, value: string) => `Bearer ${tokenFor("SEGREDO", value)}`);
   text = text.replace(/\bgk_[0-9a-f]{8}_[0-9a-f]{16,}\b/gi, (m) => tokenFor("SEGREDO", m));
   text = text.replace(/\b(?:sk|pk|ghp|AIza)[A-Za-z0-9_-]{16,}\b/g, (m) => tokenFor("SEGREDO", m));
 
   text = text.replace(/(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)/g, (m) => (luhnValid(m) ? tokenFor("CARTAO", m) : m));
+  text = text.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g, (m) => tokenFor("EMAIL", m));
   text = text.replace(/(?<!\d)\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}(?!\d)/g, (m) => (cnpjValid(m) ? tokenFor("CNPJ", m) : m));
   text = text.replace(/(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)/g, (m) => (cpfValid(m) ? tokenFor("CPF", m) : m));
-  text = text.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g, (m) => tokenFor("EMAIL", m));
   text = text.replace(
     /(?<![\d.])(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?!\.?\d)/g,
     (m) => tokenFor("IP", m),
