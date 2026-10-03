@@ -19,7 +19,7 @@ test("painel de métricas e saúde do sistema", async ({ browser }) => {
   await admin.goto("/dashboard?period=last_90_days");
   const csat = admin.getByRole("region", { name: "Satisfação" });
   await expect(csat).toBeVisible();
-  await expect(csat.getByText("Nota média")).toBeVisible();
+  await expect(csat.getByText("Nota média", { exact: true })).toBeVisible();
   await expect(csat.getByText("Avaliações", { exact: true })).toBeVisible();
   await expect(admin.getByRole("region", { name: "IA no atendimento" }).getByText("Triagem aceita")).toBeVisible();
   const usage = admin.getByRole("region", { name: "Uso e custo de IA" });
