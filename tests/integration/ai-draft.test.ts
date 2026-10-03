@@ -231,6 +231,44 @@ describe("equipe com a IA desligada", () => {
   });
 });
 
+describe("rascunho publicado", () => {
+  it("discardDraft com published grava o evento AI_DRAFT_PUBLISHED (sem texto) e sem a opção não grava", async () => {
+    await knowledge();
+    const t = await currentTicket();
+    await run(agent, t.id);
+    await ai.discardDraft(agent, t.id);
+    expect(await db.ticketEvent.count({ where: { ticketId: t.id, type: "AI_DRAFT_PUBLISHED" } })).toBe(0);
+    await run(agent, t.id);
+    await ai.discardDraft(agent, t.id, { published: true });
+    const ev = await db.ticketEvent.findMany({ where: { ticketId: t.id, type: "AI_DRAFT_PUBLISHED" } });
+    expect(ev).toHaveLength(1);
+    expect(JSON.stringify(ev[0].data)).not.toMatch(/Com base nas fontes/);
+  });
+
+  it("sem rascunho existente o evento de publicação não é gravado", async () => {
+    await knowledge();
+    const t = await currentTicket();
+    await ai.discardDraft(agent, t.id, { published: true });
+    expect(await db.ticketEvent.count({ where: { ticketId: t.id, type: "AI_DRAFT_PUBLISHED" } })).toBe(0);
+  });
+
+  it("a rota DELETE aceita ?published=1", async () => {
+    await knowledge();
+    const t = await currentTicket();
+    await run(agent, t.id);
+    const { createSession } = await import("@/modules/auth/session");
+    process.env.APP_URL = "http://app.test";
+    const cookie = `session=${await createSession(agent.id)}`;
+    const { DELETE } = await import("@/app/api/tickets/[id]/ai/draft/route");
+    const res = await DELETE(
+      new Request(`http://app.test/api/tickets/${t.id}/ai/draft?published=1`, { method: "DELETE", headers: { cookie, origin: "http://app.test" } }),
+      { params: Promise.resolve({ id: t.id }) },
+    );
+    expect(res.status).toBe(200);
+    expect(await db.ticketEvent.count({ where: { ticketId: t.id, type: "AI_DRAFT_PUBLISHED" } })).toBe(1);
+  });
+});
+
 describe("discardDraft", () => {
   it("apaga o rascunho; quem não pode atender recebe 404", async () => {
     await knowledge();

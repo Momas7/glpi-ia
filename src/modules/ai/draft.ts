@@ -150,7 +150,12 @@ export async function suggestDraft(actor: SessionUser, ticketId: string, deps: D
   return { outcome: "DRAFTED", comment: { id: comment.id, body: comment.body, sources: refs } };
 }
 
-export async function discardDraft(actor: SessionUser, ticketId: string): Promise<void> {
+export async function discardDraft(actor: SessionUser, ticketId: string, opts: { published?: boolean } = {}): Promise<void> {
   await loadDraftableTicket(actor, ticketId);
-  await getDb().comment.deleteMany({ where: { ticketId, source: "AI_DRAFT" } });
+  const db = getDb();
+  const removed = await db.comment.deleteMany({ where: { ticketId, source: "AI_DRAFT" } });
+  // O rascunho virou comentário público: registra para o painel de métricas (sem o texto).
+  if (opts.published && removed.count > 0) {
+    await db.ticketEvent.create({ data: { ticketId, actorId: actor.id, type: "AI_DRAFT_PUBLISHED", data: {} } });
+  }
 }
