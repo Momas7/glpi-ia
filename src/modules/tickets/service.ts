@@ -2,6 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/lib/db";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { escapeLike } from "@/lib/like";
+import { enqueueTriage } from "@/modules/ai/enqueue";
 import { emitTicketEvent } from "@/modules/integrations";
 import { slaOnCreate, slaOnPriorityChange, slaOnStatusChange } from "@/modules/sla";
 import { can, type SessionUser } from "@/modules/auth";
@@ -112,6 +113,7 @@ export async function createTicket(actor: SessionUser, input: CreateTicketInput,
     });
     await slaOnCreate(tx, ticket.id, new Date());
     await emitTicketEvent(tx, "ticket.created", ticket.id);
+    await enqueueTriage(tx, ticket.id);
     for (const hook of createdHooks) await hook(tx, ticket);
     return tx.ticket.findUniqueOrThrow({ where: { id: ticket.id }, include });
   });

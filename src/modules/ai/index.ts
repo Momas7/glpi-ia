@@ -4,3 +4,6 @@ export { cleanupAuditInputs, runAi, type AiDeps, type AiRequest, type AiRunResul
 export { defaultTriageModel, estimateCostUsd } from "./pricing";
 export { getLlmProvider } from "./provider/factory";
 export type { LLMProvider, LLMRequest, LLMResult } from "./provider/types";
+export { AI_TRIAGE_QUEUE } from "./enqueue";
+export { registerAiJobs } from "./jobs";
+export { buildTriagePrompt, runTriage, triageOutputSchema } from "./triage";
