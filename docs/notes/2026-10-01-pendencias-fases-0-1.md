@@ -96,6 +96,18 @@ Registro do que ficou adiado nas revisões independentes e das decisões que mud
 - Rota única `POST /api/tickets/[id]/ai/triage` com `action` no corpo, no lugar das três rotas do spec.
 - Qualidade real da triagem não medida (sem chave de API): rodar `npm run ai:eval` com Gemini e Claude.
 
+## Fase 4 (RAG): menores adiados
+
+- Busca só vetorial: códigos de erro e nomes de servidor às vezes escapam; a busca híbrida (vetor + palavras) é a evolução prevista.
+- A busca pega os 50 vizinhos mais próximos por fonte e filtra depois; em base muito grande com muitos chamados de outras equipes, vale revisar o `hnsw.iterative_scan` (já ligado quando o pgvector suporta).
+- O rascunho cita fontes, mas não verifica se cada frase é sustentada pelo trecho citado (só valida que as citações existem).
+- O rascunho usa só título e descrição do chamado como pergunta; comentários da conversa não entram.
+- A avaliação não pode ser editada nem apagada; sem fluxo para corrigir uma nota dada por engano.
+- O dashboard ainda não mostra a média das avaliações (Fase 6).
+- A solução obrigatória vale na tela e na API; chamados criados por integração ou importação direta no banco podem ficar sem solução e dependem do último comentário público da equipe.
+- Artigos sem versionamento: editar sobrescreve, sem histórico além do `AuditLog`.
+- "Reindexar tudo" ignora a cota restante do provedor: em plano gratuito pode parar no meio (basta repetir).
+
 ## Dependências de desenvolvimento com aviso de segurança
 
 - `braces` (GHSA-vfj7-8cjw-p6xm, negação de serviço por padrões aninhados, severidade alta) não tem versão corrigida (a última, 3.0.3, é a afetada). Entra só por ferramentas de desenvolvimento (CLI do `shadcn` e `eslint-config-next`, via `fast-glob`/`micromatch`). O `shadcn` foi movido para `devDependencies` e o job `audit` do CI audita só as dependências de produção (`--omit=dev`). Rever quando houver versão corrigida do `braces` ou das ferramentas que o usam.

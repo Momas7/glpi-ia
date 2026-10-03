@@ -16,6 +16,7 @@
     "worker": "SERVICE_NAME=worker tsx --env-file-if-exists=.env --tsconfig tsconfig.json src/worker/index.ts",
     "test:e2e": "playwright test",
     "ai:eval": "tsx --env-file-if-exists=.env scripts/ai-eval.mts",
+    "ai:eval:rag": "tsx --env-file-if-exists=.env scripts/ai-eval-rag.mts",
     "ai:reindex": "tsx --env-file-if-exists=.env scripts/ai-reindex.mts",
     "admin:create": "tsx --env-file-if-exists=.env scripts/create-admin.mts"
   },
