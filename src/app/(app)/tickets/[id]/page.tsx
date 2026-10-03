@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { AiDraftCard } from "@/components/AiDraftCard";
 import { AiSuggestionCard } from "@/components/AiSuggestionCard";
 import { LateRating } from "@/components/RatingBox";
 import { AttachmentForm } from "@/components/forms/AttachmentForm";
@@ -11,7 +12,7 @@ import { PriorityBadge, StatusBadge } from "@/components/StatusBadges";
 import { Badge } from "@/components/ui/badge";
 import { TYPE_LABEL, formatDateTime } from "@/lib/labels";
 import { requireUser } from "@/lib/server-session";
-import { getPendingTriage } from "@/modules/ai";
+import { getDraftView, getPendingTriage } from "@/modules/ai";
 import { can } from "@/modules/auth";
 import { loadCalendar, slaState } from "@/modules/sla";
 import { RATING_WINDOW_DAYS, TRANSITIONS, getComments, getRating, getTicket, listAssignmentOptions, listAttachments } from "@/modules/tickets";
@@ -24,11 +25,12 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
   const ticket = await getTicket(user, id);
   if (!ticket) notFound();
 
-  const [comments, attachments, aiSuggestion, rating] = await Promise.all([
+  const [comments, attachments, aiSuggestion, rating, draftView] = await Promise.all([
     getComments(user, id),
     listAttachments(user, id),
     getPendingTriage(user, ticket),
     getRating(user, id),
+    getDraftView(user, ticket),
   ]);
   const withinRatingWindow =
     ticket.status === "CLOSED" && (!ticket.closedAt || new Date().getTime() <= ticket.closedAt.getTime() + RATING_WINDOW_DAYS * 86_400_000);
@@ -85,8 +87,8 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
 
           <section className="flex flex-col gap-3">
             <h2 className="font-medium">Comentários</h2>
-            {comments.length === 0 && <p className="text-sm text-muted-foreground">Nenhum comentário ainda.</p>}
-            {comments.map((c) => (
+            {comments.filter((c) => c.source !== "AI_DRAFT").length === 0 && <p className="text-sm text-muted-foreground">Nenhum comentário ainda.</p>}
+            {comments.filter((c) => c.source !== "AI_DRAFT").map((c) => (
               <article
                 key={c.id}
                 className={`rounded-lg border p-3 ${c.internal ? "border-amber-500/40 bg-amber-500/5" : "border-white/10"}`}
@@ -99,6 +101,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
                 <SafeText value={c.body} className="space-y-2 text-sm" />
               </article>
             ))}
+            <AiDraftCard key={draftView.draft?.id ?? "sem-rascunho"} ticketId={ticket.id} available={draftView.available} draft={draftView.draft} />
             {can(user, "comment:create", ticket) && (
               <CommentForm ticketId={ticket.id} canInternal={can(user, "comment:read_internal", ticket)} />
             )}

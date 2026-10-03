@@ -5,6 +5,8 @@ import { ForbiddenError, NotFoundError } from "@/lib/errors";
 import { recordAudit } from "@/modules/audit";
 import { can, type SessionUser } from "@/modules/auth";
 import type { TicketWithRefs } from "@/modules/tickets";
+import { stripCitations, type DraftSourceRef } from "./draft";
+import { getEmbeddingProvider } from "./embedding/factory";
 import { defaultTriageModel } from "./pricing";
 import { getLlmProvider } from "./provider/factory";
 import { startOfDay } from "./run";
@@ -146,4 +148,31 @@ export async function setTeamAi(actor: SessionUser, teamId: string, enabled: boo
     await tx.team.update({ where: { id: teamId }, data: { aiEnabled: enabled } });
     await recordAudit(tx, { actorId: actor.id, action: "team.ai_toggle", targetType: "team", targetId: teamId, data: { enabled } });
   });
+}
+
+export interface DraftView {
+  /** O botão "Sugerir resposta" só aparece com a IA ligada, providers configurados e permissão de atender o chamado. */
+  available: boolean;
+  draft: { id: string; text: string; sources: DraftSourceRef[] } | null;
+}
+
+type DraftViewConfig = Pick<
+  Config,
+  "AI_ENABLED" | "LLM_PROVIDER" | "EMBEDDING_PROVIDER" | "GEMINI_API_KEY" | "ANTHROPIC_API_KEY"
+>;
+
+/** O rascunho de resposta do chamado (nota interna `AI_DRAFT`) e se dá para pedir outro. */
+export async function getDraftView(actor: SessionUser, ticket: TicketWithRefs, config: DraftViewConfig = getConfig()): Promise<DraftView> {
+  if (!can(actor, "ai:decide", ticket)) return { available: false, draft: null };
+  const available = config.AI_ENABLED && getLlmProvider(config) !== null && getEmbeddingProvider(config) !== null;
+  if (!can(actor, "comment:read_internal", ticket)) return { available, draft: null };
+  const comment = await getDb().comment.findFirst({
+    where: { ticketId: ticket.id, source: "AI_DRAFT", internal: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!comment) return { available, draft: null };
+  return {
+    available,
+    draft: { id: comment.id, text: stripCitations(comment.body), sources: (comment.sources ?? []) as unknown as DraftSourceRef[] },
+  };
 }

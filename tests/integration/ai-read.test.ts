@@ -102,3 +102,44 @@ describe("leitura da sugestão", () => {
     expect((await ai.pendingTriageTicketIds(requester, [a, bFull])).size).toBe(0);
   });
 });
+
+describe("getDraftView", () => {
+  const config = (over: Record<string, unknown> = {}) =>
+    ({ AI_ENABLED: true, LLM_PROVIDER: "fake", EMBEDDING_PROVIDER: "fake", ...over }) as never;
+
+  async function withDraft() {
+    const t = await withSuggestion();
+    await db.comment.create({
+      data: {
+        ticketId: t.id, authorId: agent.id, body: "Reinicie o ponto [1].", internal: true, source: "AI_DRAFT",
+        sources: [{ kind: "article", id: "a1", title: "Wi-Fi sem conexão" }],
+      },
+    });
+    return t;
+  }
+
+  it("o técnico da equipe recebe o rascunho sem as marcas de citação e com as fontes", async () => {
+    const t = await withDraft();
+    const view = await ai.getDraftView(agent, t, config());
+    expect(view.available).toBe(true);
+    expect(view.draft).toMatchObject({ text: "Reinicie o ponto.", sources: [{ kind: "article", id: "a1", title: "Wi-Fi sem conexão" }] });
+  });
+
+  it("sem rascunho devolve draft nulo, mas disponível", async () => {
+    const t = await withSuggestion();
+    expect(await ai.getDraftView(agent, t, config())).toEqual({ available: true, draft: null });
+  });
+
+  it("solicitante e técnico de outra equipe não têm nada", async () => {
+    const t = await withDraft();
+    expect(await ai.getDraftView(requester, t, config())).toEqual({ available: false, draft: null });
+    expect(await ai.getDraftView(outsider, t, config())).toEqual({ available: false, draft: null });
+  });
+
+  it("IA desligada ou provider sem chave: indisponível", async () => {
+    const t = await withDraft();
+    expect((await ai.getDraftView(agent, t, config({ AI_ENABLED: false }))).available).toBe(false);
+    expect((await ai.getDraftView(agent, t, config({ LLM_PROVIDER: "gemini" }))).available).toBe(false);
+    expect((await ai.getDraftView(agent, t, config({ EMBEDDING_PROVIDER: "gemini" }))).available).toBe(false);
+  });
+});
