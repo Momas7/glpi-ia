@@ -46,7 +46,7 @@ export async function indexArticle(articleId: string, deps: IndexDeps = {}): Pro
 }
 
 /** Solução do chamado: a escrita ao resolver; nos antigos, o último comentário público de um técnico. */
-async function solutionOf(
+export async function ticketSolution(
   db: ReturnType<typeof dbOf>,
   ticket: { id: string; resolution: string | null; resolvedAt: Date | null },
 ): Promise<string | null> {
@@ -73,7 +73,7 @@ export async function indexTicket(ticketId: string, deps: IndexDeps = {}): Promi
   const ticket = await db.ticket.findUnique({ where: { id: ticketId }, include: { rating: { select: { stars: true } } } });
   if (!ticket || (ticket.status !== "RESOLVED" && ticket.status !== "CLOSED")) return remove();
   if (ticket.rating && ticket.rating.stars <= 2) return remove();
-  const solution = await solutionOf(db, ticket);
+  const solution = await ticketSolution(db, ticket);
   if (!solution) return remove();
 
   const text = ticketKnowledgeText({ title: ticket.title, description: ticket.description, solution });
