@@ -13,13 +13,15 @@ let name: string;
 let backupDir: string;
 let uploadsDir: string;
 
-const RUNTIME = process.env.RUNTIME ?? (spawnSync("podman", ["--version"]).status === 0 ? "podman" : "docker");
+// O runtime é o que enxerga o contêiner do Testcontainers (na máquina do dono é o Podman; no CI, o Docker).
+let RUNTIME = "podman";
 
 beforeAll(async () => {
   container = await new PostgreSqlContainer("docker.io/pgvector/pgvector:pg16").start();
   execFileSync("npx", ["prisma", "migrate", "deploy"], { env: { ...process.env, DATABASE_URL: container.getConnectionUri() }, stdio: "pipe" });
   db = createDb(container.getConnectionUri());
   name = container.getName().replace(/^\//, "");
+  RUNTIME = ["podman", "docker"].find((r) => spawnSync(r, ["inspect", name], { stdio: "ignore" }).status === 0) ?? "podman";
 }, 120_000);
 
 afterAll(async () => {
