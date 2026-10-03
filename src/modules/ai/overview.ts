@@ -266,7 +266,9 @@ export async function getDuplicatesView(actor: SessionUser, ticket: TicketWithRe
   const candidates = payload.candidates.flatMap((c) => {
     const t = byId.get(c.ticketId);
     if (!t || !OPEN_STATUS.includes(t.status)) return [];
-    return [{ id: t.id, number: t.number, title: t.title, status: t.status, similarity: c.similarity, canOpen: can(actor, "ticket:read", t as never) }];
+    const canOpen = can(actor, "ticket:read", t as never);
+    // Chamado que o técnico não pode abrir (ex.: o chamado mudou de equipe) aparece sem o título.
+    return [{ id: t.id, number: t.number, title: canOpen ? t.title : "Chamado de outra equipe", status: t.status, similarity: c.similarity, canOpen }];
   });
   return candidates.length === 0 ? null : { id: s.id, candidates };
 }

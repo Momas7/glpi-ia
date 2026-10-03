@@ -49,3 +49,5 @@ export { AI_DETECT_QUEUE } from "./enqueue";
 export { detectForTicket, findDuplicates, type DetectConfig, type DetectDeps, type DuplicateCandidate } from "./detect";
 export { closeFinishedIncidents, closeIncident, detectIncident, getIncidentNotice, getOpenIncidentBanner, listIncidents, type IncidentRow } from "./incidents";
 export { MIN_SUMMARY_COMMENTS, buildSummaryPrompt, summarizeTicket, summaryOutputSchema, type SummaryResult } from "./summary";
+export { enableIterativeScan, withIterativeScan } from "./embed-utils";
+export { refreshOpenVector } from "./open-vectors";

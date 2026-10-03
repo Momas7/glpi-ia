@@ -1,29 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { getConfig } from "@/lib/config";
 import { getDb } from "@/lib/db";
-import { chunkText, contentHash } from "./chunking";
+import { chunkText } from "./chunking";
+import { signed, toVectorLiteral } from "./embed-utils";
 import { runEmbed, type EmbedDeps } from "./embedding/run";
+import { refreshOpenVector } from "./open-vectors";
 
 export type IndexResult = "indexed" | "unchanged" | "removed";
 export type IndexDeps = Partial<EmbedDeps>;
 
+export { embedSignature, signed, toVectorLiteral } from "./embed-utils";
+
 const dbOf = (deps: IndexDeps) => deps.db ?? getDb();
-
-/**
- * Identifica quem gerou o vetor (provider e modelo). Entra no hash do conteúdo: vetores de modelos diferentes
- * não são comparáveis, então trocar de modelo ou de provider invalida o índice e "Reindexar tudo" refaz tudo.
- */
-export function embedSignature(deps: IndexDeps): string {
-  if (deps.model !== undefined && deps.provider !== undefined) return `${deps.provider?.name ?? "none"}|${deps.model}`;
-  const config = getConfig();
-  return `${deps.provider?.name ?? config.EMBEDDING_PROVIDER}|${deps.model ?? config.AI_EMBEDDING_MODEL}`;
-}
-export const signed = (deps: IndexDeps, text: string) => contentHash(`${embedSignature(deps)}\u0000${text}`);
-
-/** Literal que o pgvector entende: "[0.1,0.2,...]". Sempre passado como parâmetro, nunca concatenado ao SQL. */
-export function toVectorLiteral(v: number[]): string {
-  return `[${v.join(",")}]`;
-}
 
 export function ticketKnowledgeText(t: { title: string; description: string; solution: string }): string {
   return `${t.title}\n\n${t.description}\n\nSolução: ${t.solution}`;
@@ -115,7 +102,7 @@ export async function indexTicket(ticketId: string, deps: IndexDeps = {}): Promi
 export async function reindexAll(
   opts: { batchSize?: number; pauseMs?: number; sleep?: (ms: number) => Promise<void> } = {},
   deps: IndexDeps = {},
-): Promise<{ articles: number; tickets: number }> {
+): Promise<{ articles: number; tickets: number; openTickets: number }> {
   const db = dbOf(deps);
   const batchSize = opts.batchSize ?? 10;
   const pauseMs = opts.pauseMs ?? 5000;
@@ -125,17 +112,31 @@ export async function reindexAll(
   const ticketIds = (
     await db.ticket.findMany({ where: { status: { in: ["RESOLVED", "CLOSED"] } }, select: { id: true }, orderBy: { createdAt: "asc" } })
   ).map((t) => t.id);
+  // Vetores de chamados abertos (duplicados e incidentes): quem ficou sem (cota estourada), quem mudou de modelo e quem
+  // já foi encerrado e ainda tem vetor.
+  const openIds = (
+    await db.$queryRaw<{ id: string }[]>`
+      SELECT t."id" FROM "Ticket" t
+      WHERE t."status" IN ('NEW', 'OPEN', 'PENDING') OR EXISTS (SELECT 1 FROM "OpenTicketVector" v WHERE v."ticketId" = t."id")
+      ORDER BY t."createdAt" ASC`
+  ).map((r) => r.id);
   const work = [
     ...articleIds.map((id) => ({ kind: "article" as const, id })),
     ...ticketIds.map((id) => ({ kind: "ticket" as const, id })),
+    ...openIds.map((id) => ({ kind: "open" as const, id })),
   ];
 
-  const done = { articles: 0, tickets: 0 };
+  const done = { articles: 0, tickets: 0, openTickets: 0 };
   for (let i = 0; i < work.length; i += batchSize) {
     if (i > 0) await sleep(pauseMs);
     for (const item of work.slice(i, i + batchSize)) {
-      const result = item.kind === "article" ? await indexArticle(item.id, deps) : await indexTicket(item.id, deps);
-      if (result === "indexed") done[item.kind === "article" ? "articles" : "tickets"]++;
+      const result =
+        item.kind === "article"
+          ? await indexArticle(item.id, deps)
+          : item.kind === "ticket"
+            ? await indexTicket(item.id, deps)
+            : await refreshOpenVector(item.id, deps);
+      if (result === "indexed") done[item.kind === "article" ? "articles" : item.kind === "ticket" ? "tickets" : "openTickets"]++;
     }
   }
   return done;

@@ -4,6 +4,8 @@ import { AppError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { emitEvent } from "@/modules/integrations";
 import { recordAudit } from "@/modules/audit";
 import { can, type SessionUser } from "@/modules/auth";
+import { enableIterativeScan } from "./embed-utils";
+import { mask } from "./masking";
 import { dbOf, nowOf, resolveDetectConfig, vectorLiteralOf, type DetectDeps } from "./detect-shared";
 
 export interface IncidentRow {
@@ -34,6 +36,7 @@ export async function detectIncident(ticketId: string, deps: DetectDeps = {}): P
 
   return db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('incident-detect'))`;
+    await enableIterativeScan(tx);
     const rows = await tx.$queryRaw<{ id: string; title: string; createdAt: Date; incidentGroupId: string | null; groupStatus: string | null; teamName: string | null }[]>`
       SELECT t."id", t."title", t."createdAt", t."incidentGroupId", g."status"::text AS "groupStatus", tm."name" AS "teamName"
       FROM "OpenTicketVector" v
@@ -43,6 +46,7 @@ export async function detectIncident(ticketId: string, deps: DetectDeps = {}): P
       WHERE t."status" IN ('NEW', 'OPEN', 'PENDING')
         AND t."createdAt" >= ${since}
         AND (t."teamId" IS NULL OR tm."aiEnabled" = true)
+        AND (t."incidentGroupId" IS NULL OR g."status" = 'OPEN')
         AND (t."id" = ${ticketId} OR 1 - (v."embedding" <=> ${vec}::vector) >= ${cfg.incidentMinSimilarity})
       ORDER BY t."createdAt" ASC`;
     if (!rows.some((r) => r.id === ticketId) || rows.length < cfg.incidentMinTickets) return null;
@@ -57,7 +61,8 @@ export async function detectIncident(ticketId: string, deps: DetectDeps = {}): P
       return { groupId: existing, created: false };
     }
 
-    const group = await tx.incidentGroup.create({ data: { title: rows[0].title.slice(0, TITLE_LIMIT) } });
+    // O título vai ao n8n e a todos os gestores do grupo: sai mascarado.
+    const group = await tx.incidentGroup.create({ data: { title: mask(rows[0].title).text.slice(0, TITLE_LIMIT) } });
     await tx.ticket.updateMany({ where: { id: { in: ids } }, data: { incidentGroupId: group.id } });
     const appUrl = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
     const teams = [...new Set(rows.map((r) => r.teamName).filter((n): n is string => !!n))].sort();

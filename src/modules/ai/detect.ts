@@ -1,8 +1,8 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { dbOf, nowOf, resolveDetectConfig, vectorLiteralOf, type DetectDeps } from "./detect-shared";
-import { runEmbed } from "./embedding/run";
 import { closeFinishedIncidents, detectIncident } from "./incidents";
-import { signed, toVectorLiteral } from "./indexing";
+import { withIterativeScan } from "./embed-utils";
+import { refreshOpenVector } from "./open-vectors";
 
 export type { DetectConfig, DetectDeps } from "./detect-shared";
 
@@ -13,10 +13,8 @@ export interface DuplicateCandidate {
   similarity: number;
 }
 
-const OPEN_STATUSES = ["NEW", "OPEN", "PENDING"];
 const MAX_CANDIDATES = 3;
 const POOL = 10;
-const DESCRIPTION_LIMIT = 4000;
 
 /**
  * Chamados abertos da MESMA equipe, das últimas horas da janela, parecidos com o chamado (nunca ele mesmo).
@@ -29,7 +27,7 @@ export async function findDuplicates(ticketId: string, deps: DetectDeps = {}): P
   const vec = await vectorLiteralOf(db, ticketId);
   if (!ticket?.teamId || !vec) return [];
   const since = new Date(nowOf(deps).getTime() - cfg.duplicateWindowHours * 3600_000);
-  const rows = await db.$queryRaw<{ ticketId: string; number: number; title: string; sim: number }[]>`
+  const rows = await withIterativeScan(db, (tx) => tx.$queryRaw<{ ticketId: string; number: number; title: string; sim: number }[]>`
     SELECT t."id" AS "ticketId", t."number", t."title", 1 - (v."embedding" <=> ${vec}::vector) AS sim
     FROM "OpenTicketVector" v
     JOIN "Ticket" t ON t."id" = v."ticketId"
@@ -40,7 +38,7 @@ export async function findDuplicates(ticketId: string, deps: DetectDeps = {}): P
       AND tm."aiEnabled" = true
       AND t."createdAt" >= ${since}
     ORDER BY v."embedding" <=> ${vec}::vector
-    LIMIT ${POOL}`;
+    LIMIT ${POOL}`);
   return rows
     .map((r) => ({ ticketId: r.ticketId, number: r.number, title: r.title, similarity: Number(r.sim) }))
     .filter((r) => r.similarity >= cfg.duplicateMinSimilarity)
@@ -54,28 +52,11 @@ export async function findDuplicates(ticketId: string, deps: DetectDeps = {}): P
  */
 export async function detectForTicket(ticketId: string, deps: DetectDeps = {}): Promise<"detected" | "removed" | "skipped"> {
   const db = dbOf(deps);
-  const ticket = await db.ticket.findUnique({ where: { id: ticketId }, include: { team: { select: { aiEnabled: true } } } });
-  if (!ticket) return "skipped";
-
-  const remove = async (): Promise<"removed"> => {
-    await db.$executeRaw`DELETE FROM "OpenTicketVector" WHERE "ticketId" = ${ticketId}`;
-    await closeFinishedIncidents(dbOf(deps));
+  const refreshed = await refreshOpenVector(ticketId, deps);
+  if (refreshed === "skipped") return "skipped";
+  if (refreshed === "removed") {
+    await closeFinishedIncidents(db);
     return "removed";
-  };
-  if (!OPEN_STATUSES.includes(ticket.status)) return remove();
-  if (ticket.team && !ticket.team.aiEnabled) return remove();
-
-  const text = `${ticket.title}\n\n${ticket.description.slice(0, DESCRIPTION_LIMIT)}`;
-  const hash = signed(deps, text);
-  const existing = await db.$queryRaw<{ contentHash: string }[]>`SELECT "contentHash" FROM "OpenTicketVector" WHERE "ticketId" = ${ticketId}`;
-  if (existing[0]?.contentHash !== hash) {
-    const result = await runEmbed({ jobType: "detect", ticketId, texts: [text], kind: "document" }, deps);
-    if (result.outcome !== "OK") return "skipped";
-    const literal = toVectorLiteral(result.vectors[0]);
-    await db.$executeRaw`
-      INSERT INTO "OpenTicketVector" ("ticketId", "contentHash", "embedding", "createdAt")
-      VALUES (${ticketId}, ${hash}, ${literal}::vector, now())
-      ON CONFLICT ("ticketId") DO UPDATE SET "contentHash" = EXCLUDED."contentHash", "embedding" = EXCLUDED."embedding"`;
   }
 
   if (!(await db.aiSuggestion.findUnique({ where: { ticketId_kind: { ticketId, kind: "DUPLICATE" } } }))) {
@@ -94,4 +75,3 @@ export async function detectForTicket(ticketId: string, deps: DetectDeps = {}): 
   await detectIncident(ticketId, deps);
   return "detected";
 }
-
