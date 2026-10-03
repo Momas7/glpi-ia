@@ -1,4 +1,5 @@
 # Produção local (uma máquina só): Caddy com HTTPS interno na frente do web; worker e Postgres em rede interna.
+# O sufixo ":z" nas montagens de arquivos do host é para SELinux (Fedora, RHEL): sem ele o contêiner não lê o arquivo.
 # Uso: scripts/prod-init.sh && podman-compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 name: chamados
 
@@ -59,7 +60,7 @@ services:
       BACKUP_STATE_FILE: /backups/estado-backup.json
     volumes:
       - uploads:/data/uploads
-      - ${BACKUP_DIR:-./backups}:/backups:ro
+      - ${BACKUP_DIR:-./backups}:/backups:ro,z
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,7 +95,7 @@ services:
       - "127.0.0.1:${HTTPS_PORT:-8443}:443"
       - "127.0.0.1:${HTTP_PORT:-8080}:80"
     volumes:
-      - ./config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro,z
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

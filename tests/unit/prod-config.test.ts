@@ -60,6 +60,19 @@ describe("docker-compose.prod.yml", () => {
     expect(service("web")).toMatch(/BACKUP_STATE_FILE:\s*\/backups\/estado-backup\.json/);
   });
 
+  it("montagens de arquivos do host levam :z (SELinux: sem isso o contêiner não consegue ler o Caddyfile nem os backups)", () => {
+    expect(service("caddy")).toMatch(/Caddyfile:\/etc\/caddy\/Caddyfile:ro,z/);
+    expect(service("web")).toMatch(/:\/backups:ro,z/);
+  });
+
+  it("criar o primeiro admin usa `exec` no worker em execução e passa a senha só pelo ambiente (nunca como argumento)", () => {
+    const script = JSON.parse(read("package.json")).scripts["prod:admin"] as string;
+    expect(script).toMatch(/exec -e ADMIN_PASSWORD /);
+    expect(script).toMatch(/admin:create/);
+    expect(script).not.toMatch(/ADMIN_PASSWORD=/); // o valor não vai na linha de comando
+    expect(script).not.toMatch(/run --rm/);
+  });
+
   it("a IA nasce desligada e o app sabe que está atrás de um proxy", () => {
     expect(compose()).toMatch(/AI_ENABLED:\s*\$\{AI_ENABLED:-false\}/);
     expect(compose()).toMatch(/TRUSTED_PROXY_HOPS:\s*"?1"?/);

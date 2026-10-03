@@ -31,6 +31,8 @@ curl -sk https://localhost:8443/api/health/ready
 
 Deve responder `{"status":"ok", …}`. Se o worker acabou de subir, espere até 1 minuto pelo primeiro batimento.
 
+Em Fedora/RHEL (SELinux) as montagens do compose já levam `:z`, que ajusta o rótulo do `Caddyfile` e da pasta de backup para o contêiner poder lê-los.
+
 ### Criar o primeiro administrador
 
 ```bash
@@ -38,7 +40,7 @@ read -rs ADMIN_PASSWORD && export ADMIN_PASSWORD
 npm run prod:admin -- --email voce@exemplo.com --name "Seu Nome"
 ```
 
-A senha vem só da variável (nunca de argumento) e precisa seguir a política (12 caracteres ou mais).
+O comando roda dentro do contêiner do worker já em execução (`chamados_worker_1`; com Docker Compose o nome usa hífen: `WORKER_CONTAINER=chamados-worker-1` e `RUNTIME=docker`). A senha vem só da variável (nunca de argumento) e precisa seguir a política (12 caracteres ou mais).
 
 ### Abrir no navegador
 
