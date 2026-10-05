@@ -17,12 +17,16 @@ export type AuditAction =
   | "sla.policy_update"
   | "sla.hours_update"
   | "holiday.create"
-  | "holiday.delete";
+  | "holiday.delete"
+  | "ai.suggestion_accept"
+  | "ai.suggestion_edit"
+  | "ai.suggestion_reject"
+  | "team.ai_toggle";
 
 export interface AuditEntry {
   actorId: string;
   action: AuditAction;
-  targetType: "user" | "invite" | "team" | "category" | "apikey" | "sla";
+  targetType: "user" | "invite" | "team" | "category" | "apikey" | "sla" | "ticket";
   targetId: string;
   data?: Record<string, unknown>;
 }

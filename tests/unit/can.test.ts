@@ -149,3 +149,17 @@ describe("can: dashboard:view", () => {
     expect(can(user("REQUESTER"), "dashboard:view")).toBe(false);
   });
 });
+
+describe("can: ai:decide", () => {
+  it("segue a regra de editar o chamado: equipe, responsável e admin", () => {
+    expect(can(user("ADMIN"), "ai:decide", otherTeamTicket)).toBe(true);
+    expect(can(user("AGENT"), "ai:decide", myTeamTicket)).toBe(true);
+    expect(can(user("TEAM_LEAD"), "ai:decide", myTeamTicket)).toBe(true);
+    expect(can(user("AGENT"), "ai:decide", assignedToMe)).toBe(true);
+  });
+  it("nega a técnico de outra equipe e ao solicitante, mesmo dono do chamado", () => {
+    expect(can(user("AGENT"), "ai:decide", otherTeamTicket)).toBe(false);
+    expect(can(user("REQUESTER"), "ai:decide", ownTicket)).toBe(false);
+    expect(can(user("AGENT"), "ai:decide")).toBe(false);
+  });
+});

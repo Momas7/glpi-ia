@@ -17,7 +17,8 @@ export type Action =
   | "ticket:reopen"
   | "ticket:confirm"
   | "admin:manage"
-  | "dashboard:view";
+  | "dashboard:view"
+  | "ai:decide";
 
 export interface TicketResource {
   requesterId?: string;
@@ -50,6 +51,7 @@ export function can(user: SessionUser, action: Action, resource?: TicketResource
     case "attachment:add":
       return canAccessTicket(user, resource);
     case "ticket:update":
+    case "ai:decide":
     case "ticket:close":
     case "comment:read_internal":
       return isStaffFor(user, resource);

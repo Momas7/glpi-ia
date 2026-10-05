@@ -55,6 +55,8 @@ enum DeliveryStatus {
 model Team {
   id         String       @id @default(cuid())
   name       String       @unique
+  /// Interruptor da IA por equipe (a triagem não roda para chamados da equipe quando falso).
+  aiEnabled  Boolean      @default(true)
   categories Category[]
   members    TeamMember[]
   tickets    Ticket[]
@@ -94,6 +96,7 @@ model User {
   attachments    Attachment[]
   events         TicketEvent[]
   auditLogs      AuditLog[]
+  aiDecisions    AiSuggestion[]
   apiKeys        ApiKey[]
 }
 
@@ -167,6 +170,8 @@ model Ticket {
   apiKey      ApiKey?      @relation(fields: [apiKeyId], references: [id])
   externalRef String?
 
+  aiSuggestions AiSuggestion[]
+
   // SLA (minutos úteis; prazos sempre recalculados a partir da criação)
   slaFirstResponseMinutes      Int?
   slaResolutionMinutes         Int?
@@ -187,28 +192,28 @@ model Ticket {
   attachments Attachment[]
   events      TicketEvent[]
 
+  @@unique([apiKeyId, externalRef])
   @@index([status, teamId, assigneeId])
   @@index([createdAt])
   @@index([resolvedAt])
   @@index([firstRespondedAt])
   @@index([requesterId])
-  @@unique([apiKeyId, externalRef])
 }
 
 model Comment {
-  id        String        @id @default(cuid())
-  ticketId  String
-  ticket    Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  authorId  String
-  author    User          @relation(fields: [authorId], references: [id])
-  body      String
-  internal  Boolean       @default(false)
+  id          String        @id @default(cuid())
+  ticketId    String
+  ticket      Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User          @relation(fields: [authorId], references: [id])
+  body        String
+  internal    Boolean       @default(false)
   source      CommentSource @default(WEB)
   externalRef String?
   createdAt   DateTime      @default(now())
 
-  @@index([ticketId, createdAt])
   @@unique([ticketId, externalRef])
+  @@index([ticketId, createdAt])
 }
 
 model Attachment {
@@ -239,7 +244,9 @@ model TicketEvent {
   @@index([ticketId, createdAt])
 }
 
-/** Ações administrativas (convites, papéis, equipes, categorias, SLA, chaves de API). */
+/**
+ * Ações administrativas (convites, papéis, equipes, categorias, SLA, chaves de API).
+ */
 model AuditLog {
   id         String   @id @default(cuid())
   actorId    String
@@ -253,7 +260,9 @@ model AuditLog {
   @@index([targetType, targetId, createdAt])
 }
 
-/** Chave usada por integrações (n8n). Só o hash fica guardado; o segredo aparece uma vez na criação. */
+/**
+ * Chave usada por integrações (n8n). Só o hash fica guardado; o segredo aparece uma vez na criação.
+ */
 model ApiKey {
   id          String    @id @default(cuid())
   name        String
@@ -268,7 +277,9 @@ model ApiKey {
   tickets     Ticket[]
 }
 
-/** Registro de cada aviso enviado ao n8n (o corpo não é guardado aqui). */
+/**
+ * Registro de cada aviso enviado ao n8n (o corpo não é guardado aqui).
+ */
 model WebhookDelivery {
   id          String         @id @default(cuid())
   eventId     String         @unique
@@ -284,7 +295,9 @@ model WebhookDelivery {
   @@index([status, createdAt])
 }
 
-/** Prazos por prioridade, em minutos úteis. */
+/**
+ * Prazos por prioridade, em minutos úteis.
+ */
 model SlaPolicy {
   id                   String   @id @default(cuid())
   priority             Priority @unique
@@ -292,7 +305,9 @@ model SlaPolicy {
   resolutionMinutes    Int
 }
 
-/** Expediente por dia da semana (0 = domingo … 6 = sábado). Dia sem linha não tem expediente. */
+/**
+ * Expediente por dia da semana (0 = domingo … 6 = sábado). Dia sem linha não tem expediente.
+ */
 model BusinessHours {
   id          String @id @default(cuid())
   weekday     Int    @unique
@@ -304,4 +319,63 @@ model Holiday {
   id   String   @id @default(cuid())
   date DateTime @unique @db.Date
   name String
+}
+
+enum AiSuggestionKind {
+  TRIAGE
+}
+
+enum AiSuggestionStatus {
+  PENDING
+  ACCEPTED
+  EDITED
+  REJECTED
+}
+
+enum AiOutcome {
+  OK
+  FAILED
+  SKIPPED
+  BUDGET
+}
+
+/// Proposta da IA para um chamado. A pessoa decide; a IA nunca aplica sozinha.
+model AiSuggestion {
+  id          String             @id @default(cuid())
+  ticketId    String
+  ticket      Ticket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  kind        AiSuggestionKind
+  /// Triagem: { categoryId, priority, teamId, basis: { categoryId, priority, teamId } }
+  payload     Json
+  confidence  Float
+  status      AiSuggestionStatus @default(PENDING)
+  decidedById String?
+  decidedBy   User?              @relation(fields: [decidedById], references: [id])
+  decidedAt   DateTime?
+  createdAt   DateTime           @default(now())
+
+  @@unique([ticketId, kind])
+  @@index([status, kind])
+}
+
+/// Uma linha por chamada ao LLM. `maskedInput` só guarda texto MASCARADO e é limpo após a retenção.
+/// `ticketId` não tem chave estrangeira de propósito: o log sobrevive à exclusão do chamado.
+model AiAuditLog {
+  id           String    @id @default(cuid())
+  createdAt    DateTime  @default(now())
+  provider     String
+  model        String
+  jobType      String
+  ticketId     String?
+  inputTokens  Int
+  outputTokens Int
+  costUsd      Decimal   @db.Decimal(12, 6)
+  latencyMs    Int
+  inputHash    String
+  outcome      AiOutcome
+  error        String?
+  maskedInput  String?
+
+  @@index([createdAt])
+  @@index([jobType, createdAt])
 }

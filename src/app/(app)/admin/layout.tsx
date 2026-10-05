@@ -20,6 +20,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <Link href="/admin/sla" className="text-muted-foreground hover:text-foreground">
           SLA
         </Link>
+        <Link href="/admin/ia" className="text-muted-foreground hover:text-foreground">
+          IA
+        </Link>
       </div>
       {children}
     </div>
