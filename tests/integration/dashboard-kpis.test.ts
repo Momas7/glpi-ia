@@ -79,14 +79,17 @@ describe("queryKpis", () => {
     const asSession = (u: { id: string; name: string; email: string; role: string }, teamIds: string[]) => ({
       id: u.id, name: u.name, email: u.email, role: u.role as "REQUESTER" | "AGENT", teamIds,
     });
+    // Equipe própria: o fixture tem chamados resolvidos em datas fixas (5 a 9/10/2026) que cairiam na janela "hoje".
+    const team = await db.team.create({ data: { name: "Equipe da reabertura" } });
+    await db.teamMember.create({ data: { teamId: team.id, userId: ids.ana.id } });
     const requester = asSession(ids.requester, []);
-    const agent = asSession(ids.ana, [ids.t1]);
+    const agent = asSession(ids.ana, [team.id]);
     const created = await svc.createTicket(requester, { title: "Reabertura real", description: "d" });
-    await db.ticket.update({ where: { id: created.id }, data: { teamId: ids.t1 } });
+    await db.ticket.update({ where: { id: created.id }, data: { teamId: team.id } });
 
     const today = { from: new Date(Date.now() - 86_400_000), to: new Date(Date.now() + 86_400_000) };
     const now = new Date();
-    const kpis = () => q.queryKpis({ teamIds: [ids.t1] }, today, now);
+    const kpis = () => q.queryKpis({ teamIds: [team.id] }, today, now);
     const base = await kpis(); // chamados do fixture + este (aberto)
 
     await svc.changeStatus(agent, created.id, "OPEN");
