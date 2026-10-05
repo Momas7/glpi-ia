@@ -1,6 +1,6 @@
 # Sistema de Chamados
 
-Sistema de chamados no estilo GLPI com automações de IA: triagem automática, sugestão de resposta via RAG e resumo com detecção de duplicados e incidentes em massa. A IA propõe; uma pessoa decide.
+**Sentinela** (este repositório) é um sistema de chamados no estilo GLPI com automações de IA: triagem automática, sugestão de resposta via RAG e resumo com detecção de duplicados e incidentes em massa. A IA propõe; uma pessoa decide.
 
 > Em desenvolvimento por fases. GIF de demonstração e diagrama de arquitetura chegam ao longo das fases.
 
