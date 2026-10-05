@@ -1,13 +1,18 @@
 import { getConfig } from "@/lib/config";
 import { logger } from "@/lib/logger";
 import { registerHandler, scheduleJob, stopQueue } from "@/lib/queue";
+import { registerWebhookQueues } from "@/modules/integrations";
 import { autoCloseResolved } from "@/modules/tickets";
 
 async function main() {
-  getConfig(); // falha cedo se o ambiente estiver inválido
+  const config = getConfig(); // falha cedo se o ambiente estiver inválido
+  if (!config.N8N_WEBHOOK_URL) {
+    logger.warn("N8N_WEBHOOK_URL não definida: avisos só vão para o log e links de redefinição de senha não chegam a ninguém");
+  }
   await registerHandler("system.ping", async (data) => {
     logger.info({ data }, "system.ping recebido");
   });
+  await registerWebhookQueues();
   await registerHandler("tickets.auto_close", async () => {
     await autoCloseResolved();
   });

@@ -37,6 +37,26 @@ async function ensureQueue(instance: PgBoss, name: string) {
   ensuredQueues.add(name);
 }
 
+export interface QueueDefinition {
+  retryLimit?: number;
+  retryDelay?: number;
+  retryBackoff?: boolean;
+  deleteAfterSeconds?: number;
+  deadLetter?: string;
+}
+
+/**
+ * Cria a fila com opções próprias (ou atualiza as opções se ela já existir, ex.: após um deploy).
+ * O dead letter, se houver, precisa ter sido definido antes.
+ */
+export async function defineQueue(name: string, options: QueueDefinition): Promise<void> {
+  const instance = await getQueue();
+  const existing = await instance.getQueue(name);
+  if (existing) await instance.updateQueue(name, options);
+  else await instance.createQueue(name, { retryLimit: 3, retryDelay: 1, ...options });
+  ensuredQueues.add(name);
+}
+
 /**
  * Enfileira um job. Com `tx`, o job é gravado na mesma transação do Prisma:
  * rollback da transação descarta o job (sem jobs órfãos).

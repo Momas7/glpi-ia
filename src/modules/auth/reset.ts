@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import { sendMail } from "@/modules/notifications";
+import { emitEvent } from "@/modules/integrations";
 import { hashPassword, validatePasswordPolicy } from "./password";
 import { hashToken, revokeSessions } from "./session";
 import { appUrl, newToken } from "./tokens";
@@ -12,13 +12,16 @@ export async function requestReset(email: string): Promise<void> {
   const user = await db.user.findUnique({ where: { email: email.trim().toLowerCase() } });
   if (!user || !user.active) return;
   const { token, tokenHash } = newToken();
-  await db.passwordReset.create({
-    data: { userId: user.id, tokenHash, expiresAt: new Date(Date.now() + RESET_TTL_MS) },
-  });
-  await sendMail({
-    to: user.email,
-    subject: "Redefinição de senha",
-    text: `Para redefinir sua senha acesse: ${appUrl()}/reset?token=${token}\nO link vale por 1 hora e só pode ser usado uma vez.`,
+  const expiresAt = new Date(Date.now() + RESET_TTL_MS);
+  await db.$transaction(async (tx) => {
+    await tx.passwordReset.create({ data: { userId: user.id, tokenHash, expiresAt } });
+    // O n8n entrega o link (e-mail, Teams...). O link leva o token: o n8n não deve registrá-lo em log.
+    await emitEvent(tx, "auth.password_reset_requested", {
+      email: user.email,
+      name: user.name,
+      url: `${appUrl()}/reset?token=${token}`,
+      expiresAt: expiresAt.toISOString(),
+    });
   });
 }
 

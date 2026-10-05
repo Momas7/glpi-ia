@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { can, type SessionUser } from "@/modules/auth";
+import { emitCommentEvent } from "@/modules/integrations";
 import { ForbiddenError, TicketNotFoundError, getTicket } from "./service";
 
 export const commentSchema = z.object({
@@ -9,7 +10,12 @@ export const commentSchema = z.object({
 });
 
 /** O texto é guardado como veio; o escape acontece na renderização (SafeText). */
-export async function addComment(actor: SessionUser, ticketId: string, input: z.infer<typeof commentSchema>) {
+export async function addComment(
+  actor: SessionUser,
+  ticketId: string,
+  input: z.infer<typeof commentSchema>,
+  origin?: { source: "API"; externalRef?: string },
+) {
   const ticket = await getTicket(actor, ticketId);
   if (!ticket) throw new TicketNotFoundError();
   if (!can(actor, "comment:create", ticket)) throw new ForbiddenError();
@@ -18,12 +24,21 @@ export async function addComment(actor: SessionUser, ticketId: string, input: z.
   const db = getDb();
   return db.$transaction(async (tx) => {
     const comment = await tx.comment.create({
-      data: { ticketId, authorId: actor.id, body: input.body, internal: input.internal, source: "WEB" },
+      data: {
+        ticketId,
+        authorId: actor.id,
+        body: input.body,
+        internal: input.internal,
+        source: origin?.source ?? "WEB",
+        externalRef: origin?.externalRef,
+      },
       include: { author: { select: { id: true, name: true } } },
     });
     await tx.ticketEvent.create({
       data: { ticketId, actorId: actor.id, type: "COMMENTED", data: { internal: input.internal } },
     });
+    // Nota interna nunca sai do sistema.
+    if (!input.internal) await emitCommentEvent(tx, ticketId, comment.id, { name: actor.name, email: actor.email });
     return comment;
   });
 }

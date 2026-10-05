@@ -86,6 +86,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
             <Meta label="Equipe" value={ticket.team?.name ?? "—"} />
             <Meta label="Categoria" value={ticket.category?.name ?? "—"} />
             <Meta label="Criado em" value={formatDateTime(ticket.createdAt)} />
+            {ticket.source === "API" && <Meta label="Origem" value={`Aberto via API (${ticket.apiKey?.name ?? "chave removida"})`} />}
             {ticket.resolvedAt && <Meta label="Resolvido em" value={formatDateTime(ticket.resolvedAt)} />}
           </dl>
 

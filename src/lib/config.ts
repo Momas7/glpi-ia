@@ -21,6 +21,17 @@ const schema = z.object({
   TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).default(1),
   DEFAULT_INTAKE_TEAM: z.string().min(1).default("Suporte N1"),
   AUTO_CLOSE_DAYS: z.coerce.number().int().min(1).default(7),
+  // O Compose repassa variáveis não definidas como "": tratar como ausentes.
+  N8N_WEBHOOK_URL: z.preprocess((v) => (v === "" ? undefined : v), z.string().url().optional()),
+  N8N_WEBHOOK_SECRET: z.preprocess((v) => (v === "" ? undefined : v), z.string().optional()),
+}).superRefine((c, ctx) => {
+  if (c.N8N_WEBHOOK_URL && (!c.N8N_WEBHOOK_SECRET || c.N8N_WEBHOOK_SECRET.length < 32)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["N8N_WEBHOOK_SECRET"],
+      message: "obrigatório, com ao menos 32 caracteres, quando N8N_WEBHOOK_URL está definida",
+    });
+  }
 });
 
 export type Config = z.output<typeof schema>;

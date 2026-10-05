@@ -39,4 +39,21 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...base, AUTO_CLOSE_DAYS: "3" }).AUTO_CLOSE_DAYS).toBe(3);
     expect(() => loadConfig({ ...base, AUTO_CLOSE_DAYS: "0" })).toThrowError(/AUTO_CLOSE_DAYS/);
   });
+
+  it("N8N: segredo obrigatório (≥ 32) quando a URL existe; URL precisa ser válida", () => {
+    expect(() => loadConfig(base)).not.toThrow();
+    expect(() => loadConfig({ ...base, N8N_WEBHOOK_URL: "http://n8n.local/webhook/x" })).toThrowError(/N8N_WEBHOOK_SECRET/);
+    expect(() =>
+      loadConfig({ ...base, N8N_WEBHOOK_URL: "http://n8n.local/webhook/x", N8N_WEBHOOK_SECRET: "curto" }),
+    ).toThrowError(/N8N_WEBHOOK_SECRET/);
+    expect(
+      loadConfig({ ...base, N8N_WEBHOOK_URL: "http://n8n.local/webhook/x", N8N_WEBHOOK_SECRET: "s".repeat(32) }).N8N_WEBHOOK_URL,
+    ).toBe("http://n8n.local/webhook/x");
+    expect(() => loadConfig({ ...base, N8N_WEBHOOK_URL: "nao-e-url", N8N_WEBHOOK_SECRET: "s".repeat(32) })).toThrowError(/N8N_WEBHOOK_URL/);
+  });
+
+  it("N8N vazios (como o Compose repassa quando não definidos) contam como ausentes", () => {
+    const c = loadConfig({ ...base, N8N_WEBHOOK_URL: "", N8N_WEBHOOK_SECRET: "" });
+    expect(c.N8N_WEBHOOK_URL).toBeUndefined();
+  });
 });
