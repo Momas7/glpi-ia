@@ -25,6 +25,9 @@ const env = {
   // Triagem por IA com o provider de mentira (determinístico, sem chave nem rede).
   AI_ENABLED: "true",
   LLM_PROVIDER: "fake",
+  EMBEDDING_PROVIDER: "fake",
+  // O vetor de mentira é por palavras: um limiar mais baixo basta para o texto do E2E.
+  AI_RAG_MIN_SIMILARITY: "0.3",
 };
 
 execSync("npx prisma migrate deploy", { env, stdio: "inherit" });

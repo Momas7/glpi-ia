@@ -2,11 +2,11 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/lib/db";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { escapeLike } from "@/lib/like";
-import { enqueueTriage } from "@/modules/ai/enqueue";
+import { enqueueIndexTicket, enqueueTriage } from "@/modules/ai/enqueue";
 import { emitTicketEvent } from "@/modules/integrations";
 import { slaOnCreate, slaOnPriorityChange, slaOnStatusChange } from "@/modules/sla";
 import { can, type SessionUser } from "@/modules/auth";
-import type { CreateTicketInput, ListTicketsQuery, TicketStatus, UpdateTicketInput } from "./schemas";
+import { resolutionTextSchema, type CreateTicketInput, type ListTicketsQuery, type TicketStatus, type UpdateTicketInput } from "./schemas";
 
 const MAX_PAGE_SIZE = 100;
 
@@ -149,7 +149,7 @@ export async function applyFields(tx: Tx, actor: SessionUser, current: TicketWit
 }
 
 /** Valida e aplica a transição de status dentro de uma transação já aberta. */
-async function applyStatus(tx: Tx, actor: SessionUser, current: TicketWithRefs, to: TicketStatus): Promise<void> {
+async function applyStatus(tx: Tx, actor: SessionUser, current: TicketWithRefs, to: TicketStatus, resolution?: string): Promise<void> {
   if (!can(actor, "ticket:update", current)) throw new ForbiddenError();
   if (to === "CLOSED" && !can(actor, "ticket:close", current)) throw new ForbiddenError();
   if (!TRANSITIONS[current.status].includes(to)) throw new InvalidTransitionError(current.status, to);
@@ -161,6 +161,7 @@ async function applyStatus(tx: Tx, actor: SessionUser, current: TicketWithRefs, 
     data: {
       status: to,
       resolvedAt: to === "RESOLVED" ? now : to === "OPEN" ? null : undefined,
+      resolution: to === "RESOLVED" ? resolution : undefined,
       closedAt: to === "CLOSED" ? now : undefined,
     },
   });
@@ -172,22 +173,33 @@ async function applyStatus(tx: Tx, actor: SessionUser, current: TicketWithRefs, 
   });
   await slaOnStatusChange(tx, current.id, current.status, to, now);
   await emitTicketEvent(tx, "ticket.status_changed", current.id, { from: current.status, to });
+  // Resolvido entra na base de conhecimento; sair de Resolvido (reabrir) tira.
+  if (to === "RESOLVED" || current.status === "RESOLVED") await enqueueIndexTicket(tx, current.id);
 }
 
 export async function updateTicket(actor: SessionUser, id: string, patch: UpdateTicketInput): Promise<TicketWithRefs> {
   return patchTicket(actor, id, { fields: patch });
 }
 
-export async function changeStatus(actor: SessionUser, id: string, to: TicketStatus): Promise<TicketWithRefs> {
-  return patchTicket(actor, id, { fields: {}, status: to });
+export async function changeStatus(actor: SessionUser, id: string, to: TicketStatus, resolution?: string): Promise<TicketWithRefs> {
+  return patchTicket(actor, id, { fields: {}, status: to, resolution });
 }
 
 /** Campos e status numa única transação: se a transição for inválida, nenhum campo é gravado. */
 export async function patchTicket(
   actor: SessionUser,
   id: string,
-  input: { fields: UpdateTicketInput; status?: TicketStatus },
+  input: { fields: UpdateTicketInput; status?: TicketStatus; resolution?: string },
 ): Promise<TicketWithRefs> {
+  // A solução é obrigatória ao resolver (por qualquer caminho) e só vale nessa transição.
+  let resolution: string | undefined;
+  if (input.status === "RESOLVED") {
+    const parsed = resolutionTextSchema.safeParse(input.resolution);
+    if (!parsed.success) throw new AppError(400, "Informe a solução do chamado (de 10 a 4000 caracteres).");
+    resolution = parsed.data;
+  } else if (input.resolution !== undefined) {
+    throw new AppError(400, "A solução só vale ao marcar o chamado como resolvido.");
+  }
   const current = await loadVisible(actor, id);
   return getDb().$transaction(async (tx) => {
     if (input.status) {
@@ -195,7 +207,7 @@ export async function patchTicket(
       if (!TRANSITIONS[current.status].includes(input.status)) throw new InvalidTransitionError(current.status, input.status);
     }
     if (Object.keys(input.fields).length > 0) await applyFields(tx, actor, current, input.fields);
-    if (input.status) await applyStatus(tx, actor, current, input.status);
+    if (input.status) await applyStatus(tx, actor, current, input.status, resolution);
     return tx.ticket.findUniqueOrThrow({ where: { id }, include });
   });
 }

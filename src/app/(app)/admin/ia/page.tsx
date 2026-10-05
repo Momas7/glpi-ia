@@ -1,4 +1,5 @@
 import { AiTeamToggle } from "@/components/admin/AiTeamToggle";
+import { ReindexButton } from "@/components/admin/ReindexButton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateTime } from "@/lib/labels";
 import { requireUser } from "@/lib/server-session";
@@ -37,6 +38,19 @@ export default async function AiAdminPage() {
           Aceitas {o.acceptance.accepted} ({rate(o.acceptance.accepted)}) · editadas {o.acceptance.edited} ({rate(o.acceptance.edited)}) ·
           rejeitadas {o.acceptance.rejected} ({rate(o.acceptance.rejected)}) · aguardando decisão {o.acceptance.pending}
         </p>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="font-medium">Base de conhecimento</h2>
+        {o.ragReason && (
+          <p role="status" className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+            {o.ragReason} Sem isso o botão &quot;Sugerir resposta&quot; não aparece.
+          </p>
+        )}
+        <p className="text-sm text-muted-foreground">
+          Indexados: {o.knowledge.articles} artigos publicados ({o.knowledge.chunks} trechos) e {o.knowledge.tickets} chamados resolvidos.
+        </p>
+        <ReindexButton />
       </section>
 
       <section className="flex flex-col gap-3">

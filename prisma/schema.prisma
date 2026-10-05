@@ -97,6 +97,9 @@ model User {
   events         TicketEvent[]
   auditLogs      AuditLog[]
   aiDecisions    AiSuggestion[]
+  ratings        TicketRating[]
+  kbCreated      KbArticle[]     @relation("KbCreatedBy")
+  kbUpdated      KbArticle[]     @relation("KbUpdatedBy")
   apiKeys        ApiKey[]
 }
 
@@ -171,6 +174,10 @@ model Ticket {
   externalRef String?
 
   aiSuggestions AiSuggestion[]
+  /// Solução escrita ao marcar como Resolvido (obrigatória); alimenta a base de conhecimento.
+  resolution    String?
+  rating        TicketRating?
+  embedding     TicketEmbedding?
 
   // SLA (minutos úteis; prazos sempre recalculados a partir da criação)
   slaFirstResponseMinutes      Int?
@@ -210,6 +217,8 @@ model Comment {
   internal    Boolean       @default(false)
   source      CommentSource @default(WEB)
   externalRef String?
+  /// Rascunho da IA: fontes citadas [{ kind, id, number?, title }].
+  sources     Json?
   createdAt   DateTime      @default(now())
 
   @@unique([ticketId, externalRef])
@@ -378,4 +387,55 @@ model AiAuditLog {
 
   @@index([createdAt])
   @@index([jobType, createdAt])
+}
+
+/// Avaliação do atendimento pelo solicitante: uma por chamado (CHECK de 1 a 5 e do comentário no SQL).
+model TicketRating {
+  id        String   @id @default(cuid())
+  ticketId  String   @unique
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  raterId   String
+  rater     User     @relation(fields: [raterId], references: [id])
+  stars     Int
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+/// Artigo da base de conhecimento. Só publicado entra no RAG.
+model KbArticle {
+  id          String    @id @default(cuid())
+  title       String
+  body        String
+  published   Boolean   @default(false)
+  createdById String
+  createdBy   User      @relation("KbCreatedBy", fields: [createdById], references: [id])
+  updatedById String
+  updatedBy   User      @relation("KbUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  chunks      KbChunk[]
+
+  @@index([published])
+}
+
+/// Trecho de artigo com vetor (768). A coluna `embedding` é lida e escrita só por SQL cru.
+model KbChunk {
+  id          String                      @id @default(cuid())
+  articleId   String
+  article     KbArticle                   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  position    Int
+  text        String
+  contentHash String
+  embedding   Unsupported("vector(768)")?
+
+  @@index([articleId])
+}
+
+/// Vetor de um chamado resolvido (título + descrição + solução). Coluna `embedding` só por SQL cru.
+model TicketEmbedding {
+  ticketId    String                     @id
+  ticket      Ticket                     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  contentHash String
+  embedding   Unsupported("vector(768)")
+  indexedAt   DateTime                   @default(now())
 }

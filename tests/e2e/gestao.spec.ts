@@ -66,6 +66,8 @@ test("gestão: admin convida, técnico entra e assume, solicitante reabre com mo
   await tech.page.getByRole("button", { name: /Marcar como em andamento/i }).click();
   await expect(tech.page.getByText("Em andamento", { exact: true }).first()).toBeVisible();
   await tech.page.getByRole("button", { name: /Marcar como resolvido/i }).click();
+  await tech.page.getByLabel("Solução").fill("Reiniciei o equipamento e conferi o funcionamento.");
+  await tech.page.getByRole("button", { name: "Resolver chamado" }).click();
   await expect(tech.page.getByText("Resolvido", { exact: true }).first()).toBeVisible();
 
   // 6. Solicitante reabre informando o motivo

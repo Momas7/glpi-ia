@@ -14,6 +14,7 @@ export function buildNavItems(user: SessionUser): NavItem[] {
     { href: "/tickets", label: "Chamados" },
     { href: "/tickets/new", label: "Novo chamado" },
   ];
+  if (can(user, "kb:read")) items.push({ href: "/kb", label: "Base de conhecimento" });
   if (can(user, "dashboard:view")) items.push({ href: "/dashboard", label: "Dashboard" });
   if (can(user, "admin:manage")) items.push({ href: "/admin", label: "Administração" });
   return items;

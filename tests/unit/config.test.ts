@@ -24,7 +24,7 @@ describe("loadConfig", () => {
   it("aplica os valores default", () => {
     const c = loadConfig(base);
     expect(c.LLM_PROVIDER).toBe("fake");
-    expect(c.EMBEDDING_PROVIDER).toBe("gemini");
+    expect(c.EMBEDDING_PROVIDER).toBe("fake");
     expect(c.AI_ENABLED).toBe(false);
     expect(c.AI_DAILY_BUDGET).toBe(5);
     expect(c.UPLOAD_DIR).toBe("./uploads");
@@ -56,6 +56,23 @@ describe("loadConfig", () => {
     expect(c.GEMINI_API_KEY).toBeUndefined();
     expect(c.ANTHROPIC_API_KEY).toBeUndefined();
     expect(c.AI_MODEL_TRIAGE).toBeUndefined();
+  });
+
+  it("EMBEDDING_PROVIDER aceita fake e gemini e recusa outros", () => {
+    expect(loadConfig({ ...base, EMBEDDING_PROVIDER: "gemini" }).EMBEDDING_PROVIDER).toBe("gemini");
+    expect(() => loadConfig({ ...base, EMBEDDING_PROVIDER: "openai" })).toThrowError(/EMBEDDING_PROVIDER/);
+  });
+
+  it("limiar de similaridade do RAG: padrão 0.6, entre 0 e 1", () => {
+    expect(loadConfig(base).AI_RAG_MIN_SIMILARITY).toBe(0.6);
+    expect(loadConfig({ ...base, AI_RAG_MIN_SIMILARITY: "0.75" }).AI_RAG_MIN_SIMILARITY).toBe(0.75);
+    expect(() => loadConfig({ ...base, AI_RAG_MIN_SIMILARITY: "1.2" })).toThrowError(/AI_RAG_MIN_SIMILARITY/);
+  });
+
+  it("modelos de embedding e de rascunho", () => {
+    expect(loadConfig(base).AI_EMBEDDING_MODEL).toBe("gemini-embedding-001");
+    expect(loadConfig({ ...base, AI_MODEL_DRAFT: "" }).AI_MODEL_DRAFT).toBeUndefined();
+    expect(loadConfig({ ...base, AI_MODEL_DRAFT: "claude-sonnet-5-5" }).AI_MODEL_DRAFT).toBe("claude-sonnet-5-5");
   });
 
   it("AUTO_CLOSE_DAYS tem padrão 7 e recusa valores menores que 1", () => {

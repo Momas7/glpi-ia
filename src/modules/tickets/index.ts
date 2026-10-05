@@ -38,3 +38,4 @@ export { assignTicket, listAssignmentOptions, releaseAssignments, takeTicket } f
 export { autoCloseResolved, confirmTicket, reopenSchema, reopenTicket } from "./resolution";
 export { addCommentFromApi, createTicketFromApi } from "./inbound";
 export { applyTriageFields, type TriageFields } from "./triage-apply";
+export { RATING_WINDOW_DAYS, getRating, rateTicket, ratingSchema, type RatingInput } from "./rating";

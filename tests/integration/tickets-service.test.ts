@@ -99,11 +99,11 @@ describe("status", () => {
   it("segue NEW→OPEN→RESOLVED→CLOSED, preenchendo resolvedAt/closedAt, e limpa resolvedAt ao reabrir", async () => {
     const t = await createInT1("x");
     await svc.changeStatus(agent1, t.id, "OPEN");
-    const resolved = await svc.changeStatus(agent1, t.id, "RESOLVED");
+    const resolved = await svc.changeStatus(agent1, t.id, "RESOLVED", "Solução de teste do chamado.");
     expect(resolved.resolvedAt).not.toBeNull();
     const reopened = await svc.changeStatus(agent1, t.id, "OPEN");
     expect(reopened.resolvedAt).toBeNull();
-    await svc.changeStatus(agent1, t.id, "RESOLVED");
+    await svc.changeStatus(agent1, t.id, "RESOLVED", "Solução de teste do chamado.");
     const closed = await svc.changeStatus(agent1, t.id, "CLOSED");
     expect(closed.closedAt).not.toBeNull();
     const types = (await db.ticketEvent.findMany({ where: { ticketId: t.id }, orderBy: { createdAt: "asc" } })).map((e) => e.type);
@@ -120,7 +120,7 @@ describe("concorrência de status", () => {
   it("duas mudanças simultâneas a partir de RESOLVED: uma vence, a outra recebe 409, e o estado final é válido", async () => {
     const t = await createInT1("corrida");
     await svc.changeStatus(agent1, t.id, "OPEN");
-    await svc.changeStatus(agent1, t.id, "RESOLVED");
+    await svc.changeStatus(agent1, t.id, "RESOLVED", "Solução de teste do chamado.");
     const results = await Promise.allSettled([
       svc.changeStatus(agent1, t.id, "CLOSED"),
       svc.changeStatus(agent1, t.id, "OPEN"),
