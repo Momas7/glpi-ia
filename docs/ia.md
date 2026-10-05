@@ -79,6 +79,19 @@ Antes de qualquer texto sair para o LLM, o sistema troca por tokens reversíveis
 
 **Limites.** O aviso é auxiliar: descrições vagas ("não funciona") geram vetores distantes e podem esconder um incidente. Um pico de chamados pode esgotar a cota de embeddings; nesse caso o chamado é criado normalmente, só fica sem vetor. Chamados de equipes com a IA desligada ficam fora de tudo isso.
 
+
+## Métricas de IA (Fase 6)
+
+O **Dashboard** ganha três seções, com os mesmos filtros de equipe e período:
+
+- **Satisfação:** nota média (CSAT), número de avaliações, distribuição de 1 a 5 estrelas e tendência dos últimos 6 meses.
+- **IA no atendimento:** taxa de aceite da triagem (sugestões aceitas ou editadas entre as decididas), rascunhos gerados e publicados, duplicados sugeridos e ignorados, resumos e incidentes.
+- **Uso e custo de IA** (só admin): custo estimado por dia, chamadas, falhas, chamadas barradas pelo teto de gasto, tokens e latência mediana e p95 por tarefa (triagem, embedding, detecção, busca, rascunho e resumo).
+
+**Como ler:** custo é estimativa (tabela de preços por modelo); "aceite" mostra o que a equipe decidiu, não a verdade absoluta; o rascunho "publicado" é o que o técnico enviou como comentário. O líder só soma chamados da própria equipe e nunca vê o uso e custo de IA.
+
+**Dados de demonstração:** o seed cria meses de execuções de IA, sugestões e avaliações **fictícias**, todas marcadas (`demo`). Enquanto houver linhas assim no período, o painel avisa "Dados de demonstração incluídos". O uso real soma por cima. Nada disso é uso de empresa.
+
 ## Medir a qualidade
 
 `npm run ai:eval` roda 40 chamados rotulados (`tests/ai-eval/dataset.json`, incluindo casos ambíguos, injeção de prompt e dados sensíveis) contra o provider configurado e imprime o acerto de categoria, prioridade e equipe, o custo estimado e os erros. Com provider real ele espera 6 s entre os casos (planos gratuitos limitam por minuto; ajuste com `AI_EVAL_DELAY_MS`) e repete em erro temporário. Fica fora do CI de propósito: chama o provider escolhido, custa dinheiro e o resultado varia. Com `LLM_PROVIDER=fake` o resultado só valida o funcionamento do script (as regras do fake são por palavra-chave e acertam pouco).

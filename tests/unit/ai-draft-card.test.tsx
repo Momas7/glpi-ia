@@ -81,7 +81,7 @@ describe("AiDraftCard", () => {
     await vi.waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(call(0).url).toBe("/api/tickets/t1/comments");
     expect(JSON.parse(call(0).init.body as string)).toEqual({ body: "Texto ajustado pelo técnico.", internal: false });
-    expect(call(1).url).toBe("/api/tickets/t1/ai/draft");
+    expect(call(1).url).toBe("/api/tickets/t1/ai/draft?published=1");
     expect(call(1).init.method).toBe("DELETE");
   });
 

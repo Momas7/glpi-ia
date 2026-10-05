@@ -27,14 +27,14 @@ export interface Kpis {
 // assim o Postgres consegue usar os índices em vez de varrer a tabela.
 const col = (name: string): Prisma.Sql => Prisma.raw(`(t."${name}" AT TIME ZONE 'UTC')`); // para agrupar/extrair, nunca para filtrar
 const at = (d: Date): Prisma.Sql => Prisma.sql`${d.toISOString()}::timestamptz`;
-const utc = (d: Date): Prisma.Sql => Prisma.sql`(${at(d)} AT TIME ZONE 'UTC')`;
+export const utc = (d: Date): Prisma.Sql => Prisma.sql`(${at(d)} AT TIME ZONE 'UTC')`;
 const naked = (name: string): Prisma.Sql => Prisma.raw(`t."${name}"`);
 export const between = (name: string, r: DateRange): Prisma.Sql => Prisma.sql`${naked(name)} >= ${utc(r.from)} AND ${naked(name)} < ${utc(r.to)}`;
 
 /** Condição do escopo sobre "teamId" de Ticket (alias `t`). Sempre parametrizada. */
-const scopeSql = (scope: Scope): Prisma.Sql =>
+export const scopeSql = (scope: Scope): Prisma.Sql =>
   scope.teamIds === null ? Prisma.sql`TRUE` : Prisma.sql`t."teamId" = ANY(${scope.teamIds}::text[])`;
-const noTeams = (scope: Scope) => scope.teamIds !== null && scope.teamIds.length === 0;
+export const noTeams = (scope: Scope) => scope.teamIds !== null && scope.teamIds.length === 0;
 
 const ACTIVE = Prisma.sql`t.status IN ('NEW', 'OPEN', 'PENDING')`;
 const NOT_PAUSED = Prisma.sql`t."pausedAt" IS NULL`;

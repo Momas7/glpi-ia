@@ -8,7 +8,9 @@ type Params = { id: string };
 export const POST = withAuth<Params>(async ({ user, params }) => NextResponse.json(await suggestDraft(user, params.id)));
 
 /** Descarta o rascunho. */
-export const DELETE = withAuth<Params>(async ({ user, params }) => {
-  await discardDraft(user, params.id);
+export const DELETE = withAuth<Params>(async ({ req, user, params }) => {
+  // `?published=1`: o rascunho virou comentário público (conta nas métricas); sem isso foi só descartado.
+  const published = new URL(req.url).searchParams.get("published") === "1";
+  await discardDraft(user, params.id, { published });
   return NextResponse.json({ ok: true });
 });
