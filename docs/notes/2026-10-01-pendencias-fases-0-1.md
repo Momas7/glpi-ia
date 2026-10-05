@@ -72,6 +72,19 @@ Registro do que ficou adiado nas revisões independentes e das decisões que mud
 - Feriado com data inexistente (ex.: 2026-02-30) enviado pela API vira outra data.
 - Testes: pausa só com `pausedAt` preenchido à mão; teste de horário de verão fora do expediente; total fixo de feriados no teste do seed; E2E "Vencidos" depende da hora.
 
+## Minor adiados (Fase 2.4, dashboard)
+
+- "Vence primeiro" ordena por prazo com limite de 10: uma equipe com muitos vencidos antigos não vê os que ainda dá para salvar (decisão de produto: reservar vagas para os em risco).
+- Equipe sem resolvidos aparece como 0% no tooltip do gráfico de SLA (deveria dizer "sem dados").
+- O Recharts cria um SVG focável dentro do `role="img"` (`accessibilityLayer`).
+- A primeira semana do período aparece com o rótulo da segunda-feira anterior (semana parcial).
+- "Carga por técnico" omite quem está sem chamados abertos.
+- `resolveScope` checa a existência da equipe antes da autorização (um líder distingue 400 de 403).
+- A página do dashboard responde HTTP 200 ao negar acesso a uma equipe (o spec fala em 403).
+- Seed do histórico: resolvidos sem `pausedAt`, e o fechamento automático fecha cerca de 54 deles na primeira execução do worker.
+- Menu lateral: `aria-controls` aponta para um id que não existe com o menu fechado; o Esc não devolve o foco ao botão.
+- Cache do dashboard sem despejo de entradas vencidas e sem proteção contra rajada simultânea.
+
 ## Dependências de desenvolvimento com aviso de segurança
 
 - `braces` (GHSA-vfj7-8cjw-p6xm, negação de serviço por padrões aninhados, severidade alta) não tem versão corrigida (a última, 3.0.3, é a afetada). Entra só por ferramentas de desenvolvimento (CLI do `shadcn` e `eslint-config-next`, via `fast-glob`/`micromatch`). O `shadcn` foi movido para `devDependencies` e o job `audit` do CI audita só as dependências de produção (`--omit=dev`). Rever quando houver versão corrigida do `braces` ou das ferramentas que o usam.

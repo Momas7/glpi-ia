@@ -1,5 +1,11 @@
 import { defineConfig } from "prisma/config";
 
+try {
+  process.loadEnvFile(".env");
+} catch {
+  // sem .env: usa o ambiente do processo (CI, Docker)
+}
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {

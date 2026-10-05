@@ -125,8 +125,16 @@ export async function slaOnStatusChange(tx: Tx, ticketId: string, from: Status, 
     pausedMinutes += businessMinutesBetween(pausedAt, now, cal);
     pausedAt = null;
     const due = deadlines({ ...t, pausedMinutes }, cal);
-    Object.assign(data, { pausedMinutes, pausedAt: null, firstResponseDue: due?.firstResponseDue, resolutionDue: due?.resolutionDue });
-    if (from === "RESOLVED") Object.assign(data, { slaWarnedAt: null, slaBreachedAt: null, resolutionBusinessMinutes: null });
+    // O prazo foi empurrado: as marcas de alerta valem para o prazo antigo, então zeram (o job reavalia).
+    Object.assign(data, {
+      pausedMinutes,
+      pausedAt: null,
+      firstResponseDue: due?.firstResponseDue,
+      resolutionDue: due?.resolutionDue,
+      slaWarnedAt: null,
+      slaBreachedAt: null,
+    });
+    if (from === "RESOLVED") Object.assign(data, { resolutionBusinessMinutes: null });
   }
   if (to === "PENDING" && !pausedAt) data.pausedAt = now;
   if (to === "RESOLVED") {
