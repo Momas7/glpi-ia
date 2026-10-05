@@ -241,6 +241,30 @@ async function seedSla(db: Db): Promise<void> {
   }
 }
 
+const SLA_POLICIES = [
+  { priority: "CRITICAL", firstResponseMinutes: 60, resolutionMinutes: 240 },
+  { priority: "HIGH", firstResponseMinutes: 120, resolutionMinutes: 480 },
+  { priority: "MEDIUM", firstResponseMinutes: 240, resolutionMinutes: 1440 },
+  { priority: "LOW", firstResponseMinutes: 480, resolutionMinutes: 2400 },
+] as const;
+
+/** Política padrão, expediente seg–sex 8h–18h e feriados nacionais do ano corrente e dos 2 seguintes. */
+async function seedSla(db: Db): Promise<void> {
+  for (const p of SLA_POLICIES) {
+    await db.slaPolicy.upsert({ where: { priority: p.priority }, update: {}, create: p });
+  }
+  for (const weekday of [1, 2, 3, 4, 5]) {
+    await db.businessHours.upsert({ where: { weekday }, update: {}, create: { weekday, startMinute: 480, endMinute: 1080 } });
+  }
+  const year = new Date().getFullYear();
+  for (const y of [year, year + 1, year + 2]) {
+    for (const h of nationalHolidays(y)) {
+      const date = new Date(`${h.date}T00:00:00Z`);
+      await db.holiday.upsert({ where: { date }, update: {}, create: { date, name: h.name } });
+    }
+  }
+}
+
 async function main() {
   const db = createDb(process.env.DATABASE_URL ?? "");
   try {
