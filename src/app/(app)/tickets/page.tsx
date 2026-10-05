@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { STATUS_LABEL, formatDateTime } from "@/lib/labels";
 import { requireUser } from "@/lib/server-session";
-import { pendingTriageTicketIds } from "@/modules/ai";
+import { duplicateTicketIds, pendingTriageTicketIds } from "@/modules/ai";
 import { loadCalendar, slaState } from "@/modules/sla";
 import { listQuerySchema, listTickets } from "@/modules/tickets";
 
@@ -30,7 +30,7 @@ export default async function TicketsPage({ searchParams }: { searchParams: SP }
   });
   const query = parsed.success ? parsed.data : listQuerySchema.parse({});
   const [{ items, total, page, pageSize }, cal] = await Promise.all([listTickets(user, query), loadCalendar()]);
-  const aiPending = await pendingTriageTicketIds(user, items);
+  const [aiPending, duplicated] = await Promise.all([pendingTriageTicketIds(user, items), duplicateTicketIds(user, items)]);
   const now = new Date();
   const isStaff = user.role !== "REQUESTER";
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -140,6 +140,11 @@ export default async function TicketsPage({ searchParams }: { searchParams: SP }
                 <Link href={`/tickets/${t.id}`} className="font-medium hover:underline">
                   {t.title}
                 </Link>
+                {duplicated.has(t.id) && (
+                  <Badge variant="outline" className="ml-2 border-amber-500/50 text-amber-300">
+                    Possível duplicado
+                  </Badge>
+                )}
                 {aiPending.has(t.id) && (
                   <Badge variant="outline" className="ml-2 border-violet-500/50 text-violet-300">
                     IA sugeriu

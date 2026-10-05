@@ -17,6 +17,7 @@
     "test:e2e": "playwright test",
     "ai:eval": "tsx --env-file-if-exists=.env scripts/ai-eval.mts",
     "ai:eval:rag": "tsx --env-file-if-exists=.env scripts/ai-eval-rag.mts",
+    "ai:eval:dup": "tsx --env-file-if-exists=.env scripts/ai-eval-dup.mts",
     "ai:reindex": "tsx --env-file-if-exists=.env scripts/ai-reindex.mts",
     "admin:create": "tsx --env-file-if-exists=.env scripts/create-admin.mts"
   },

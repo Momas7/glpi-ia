@@ -12,7 +12,8 @@ export type EventType =
   | "sla.warning"
   | "sla.breached"
   | "auth.invite_created"
-  | "auth.password_reset_requested";
+  | "auth.password_reset_requested"
+  | "incident.detected";
 
 export { DELIVER_QUEUE };
 

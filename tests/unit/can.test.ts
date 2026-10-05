@@ -196,3 +196,14 @@ describe("can: ticket:rate", () => {
     expect(can(user("AGENT", "u1"), "ticket:rate", { ...mine, status: "CLOSED" })).toBe(true);
   });
 });
+
+describe("can: incidentes", () => {
+  it("líder e admin veem e encerram incidentes; técnico e solicitante não", () => {
+    for (const a of ["incident:view", "incident:close"] as Action[]) {
+      expect(can(user("TEAM_LEAD"), a), `${a} líder`).toBe(true);
+      expect(can(user("ADMIN"), a), `${a} admin`).toBe(true);
+      expect(can(user("AGENT"), a), `${a} técnico`).toBe(false);
+      expect(can(user("REQUESTER"), a), `${a} solicitante`).toBe(false);
+    }
+  });
+});

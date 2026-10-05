@@ -1,0 +1,207 @@
+[
+  {
+    "a": "Sem internet no prédio todo, ninguém conecta",
+    "b": "Estamos sem acesso à internet em todo o prédio",
+    "duplicate": true
+  },
+  {
+    "a": "Wi-Fi do segundo andar caiu",
+    "b": "A rede sem fio do 2º andar parou de funcionar",
+    "duplicate": true
+  },
+  {
+    "a": "Impressora do financeiro não imprime, fila travada",
+    "b": "Fila de impressão travada na impressora do financeiro",
+    "duplicate": true
+  },
+  {
+    "a": "Não consigo acessar o sistema de notas fiscais",
+    "b": "Sistema de notas fiscais fora do ar para mim",
+    "duplicate": true
+  },
+  {
+    "a": "VPN cai a cada poucos minutos",
+    "b": "A conexão da VPN fica caindo toda hora",
+    "duplicate": true
+  },
+  {
+    "a": "Esqueci a senha do e-mail e preciso entrar",
+    "b": "Preciso redefinir a senha do meu e-mail, não lembro",
+    "duplicate": true
+  },
+  {
+    "a": "Monitor da mesa 8 sem imagem",
+    "b": "Tela do monitor da mesa 8 está preta, sem sinal",
+    "duplicate": true
+  },
+  {
+    "a": "Teams sem áudio nas reuniões",
+    "b": "Ninguém me escuta no Teams, microfone não funciona",
+    "duplicate": true
+  },
+  {
+    "a": "Servidor de arquivos lento desde cedo",
+    "b": "A pasta de rede está muito lenta hoje de manhã",
+    "duplicate": true
+  },
+  {
+    "a": "Telefone IP do ramal 214 mudo",
+    "b": "Ramal 214 sem tom de discagem, telefone mudo",
+    "duplicate": true
+  },
+  {
+    "a": "Conta bloqueada depois de errar a senha",
+    "b": "Errei a senha várias vezes e minha conta bloqueou",
+    "duplicate": true
+  },
+  {
+    "a": "Planilha de custos fecha sozinha ao abrir",
+    "b": "O Excel fecha sozinho quando abro a planilha de custos",
+    "duplicate": true
+  },
+  {
+    "a": "Sem energia na sala de reuniões 3",
+    "b": "Falta de luz na sala de reuniões 3",
+    "duplicate": true
+  },
+  {
+    "a": "Ponto de rede da mesa 14 sem sinal",
+    "b": "Cabo de rede da mesa 14 não dá conexão",
+    "duplicate": true
+  },
+  {
+    "a": "Antivírus não atualiza, trava em 40%",
+    "b": "A atualização do antivírus para em 40% e reinicia",
+    "duplicate": true
+  },
+  {
+    "a": "Impressora do financeiro não imprime",
+    "b": "Impressora da recepção sem papel",
+    "duplicate": false
+  },
+  {
+    "a": "Sem internet no prédio todo",
+    "b": "Internet lenta só na sala do jurídico",
+    "duplicate": false
+  },
+  {
+    "a": "Esqueci a senha do e-mail",
+    "b": "Esqueci a senha da VPN",
+    "duplicate": false
+  },
+  {
+    "a": "Monitor da mesa 8 sem imagem",
+    "b": "Monitor da mesa 12 com listras na tela",
+    "duplicate": false
+  },
+  {
+    "a": "Teams sem áudio nas reuniões",
+    "b": "Teams não abre depois da atualização",
+    "duplicate": false
+  },
+  {
+    "a": "Acesso à pasta do financeiro",
+    "b": "Acesso à pasta do jurídico",
+    "duplicate": false
+  },
+  {
+    "a": "Telefone IP do ramal 214 mudo",
+    "b": "Telefone IP do ramal 310 com chiado",
+    "duplicate": false
+  },
+  {
+    "a": "VPN cai a cada poucos minutos",
+    "b": "Preciso instalar a VPN no notebook novo",
+    "duplicate": false
+  },
+  {
+    "a": "Conta bloqueada depois de errar a senha",
+    "b": "Criar conta para novo colaborador",
+    "duplicate": false
+  },
+  {
+    "a": "Wi-Fi do segundo andar caiu",
+    "b": "Wi-Fi de visitantes pede senha desconhecida",
+    "duplicate": false
+  },
+  {
+    "a": "Reservar a sala de treinamento para quarta",
+    "b": "Impressora do financeiro não imprime",
+    "duplicate": false
+  },
+  {
+    "a": "Pedido de cadeira ergonômica",
+    "b": "Servidor de arquivos lento",
+    "duplicate": false
+  },
+  {
+    "a": "Dúvida sobre benefício de transporte",
+    "b": "VPN cai a cada poucos minutos",
+    "duplicate": false
+  },
+  {
+    "a": "Ar-condicionado pingando na sala 3",
+    "b": "Esqueci a senha do e-mail",
+    "duplicate": false
+  },
+  {
+    "a": "Reembolso de despesas de viagem",
+    "b": "Monitor sem imagem",
+    "duplicate": false
+  },
+  {
+    "a": "Trocar o mouse sem fio",
+    "b": "Sistema de notas fiscais fora do ar",
+    "duplicate": false
+  },
+  {
+    "a": "Instalar editor de PDF",
+    "b": "Falta de luz na sala 3",
+    "duplicate": false
+  },
+  {
+    "a": "Horário do refeitório",
+    "b": "Teams sem áudio",
+    "duplicate": false
+  },
+  {
+    "a": "Criar contas para novo colaborador",
+    "b": "Antivírus não atualiza",
+    "duplicate": false
+  },
+  {
+    "a": "Remover acesso de ex-colaborador",
+    "b": "Ponto de rede novo na mesa 20",
+    "duplicate": false
+  },
+  {
+    "a": "Cabo HDMI da sala com mau contato",
+    "b": "Planilha de custos fecha sozinha",
+    "duplicate": false
+  },
+  {
+    "a": "Pedido de teclado novo",
+    "b": "Telefone IP mudo",
+    "duplicate": false
+  },
+  {
+    "a": "Backup de arquivos antigos",
+    "b": "Wi-Fi do segundo andar caiu",
+    "duplicate": false
+  },
+  {
+    "a": "Agendar manutenção do servidor",
+    "b": "Cadeira quebrada na sala 5",
+    "duplicate": false
+  },
+  {
+    "a": "Licença do Photoshop expirou",
+    "b": "Sem internet no prédio todo",
+    "duplicate": false
+  },
+  {
+    "a": "Troca de toner da impressora",
+    "b": "Reservar auditório para evento",
+    "duplicate": false
+  }
+]

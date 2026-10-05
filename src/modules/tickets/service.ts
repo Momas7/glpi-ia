@@ -2,7 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/lib/db";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { escapeLike } from "@/lib/like";
-import { enqueueIndexTicket, enqueueTriage } from "@/modules/ai/enqueue";
+import { enqueueDetect, enqueueIndexTicket, enqueueTriage } from "@/modules/ai/enqueue";
 import { emitTicketEvent } from "@/modules/integrations";
 import { slaOnCreate, slaOnPriorityChange, slaOnStatusChange } from "@/modules/sla";
 import { can, type SessionUser } from "@/modules/auth";
@@ -114,6 +114,7 @@ export async function createTicket(actor: SessionUser, input: CreateTicketInput,
     await slaOnCreate(tx, ticket.id, new Date());
     await emitTicketEvent(tx, "ticket.created", ticket.id);
     await enqueueTriage(tx, ticket.id);
+    await enqueueDetect(tx, ticket.id);
     for (const hook of createdHooks) await hook(tx, ticket);
     return tx.ticket.findUniqueOrThrow({ where: { id: ticket.id }, include });
   });
@@ -175,6 +176,8 @@ async function applyStatus(tx: Tx, actor: SessionUser, current: TicketWithRefs, 
   await emitTicketEvent(tx, "ticket.status_changed", current.id, { from: current.status, to });
   // Resolvido entra na base de conhecimento; sair de Resolvido (reabrir) tira.
   if (to === "RESOLVED" || current.status === "RESOLVED") await enqueueIndexTicket(tx, current.id);
+  // Resolvido sai da comparação de abertos; voltar a aberto recoloca (e fecha o grupo de incidente quando todos terminam).
+  await enqueueDetect(tx, current.id);
 }
 
 export async function updateTicket(actor: SessionUser, id: string, patch: UpdateTicketInput): Promise<TicketWithRefs> {

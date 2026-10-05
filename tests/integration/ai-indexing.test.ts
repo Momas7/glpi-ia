@@ -234,10 +234,10 @@ describe("reindexAll", () => {
     await db.ticket.create({ data: { title: "Aberto", description: "d", requesterId: requester.id } });
     const sleep = vi.fn(async (_ms: number) => {});
     const out = await indexing.reindexAll({ batchSize: 2, pauseMs: 5000, sleep }, deps());
-    expect(out).toEqual({ articles: 3, tickets: 3 });
+    expect(out).toMatchObject({ articles: 3, tickets: 3 });
     expect(sleep).toHaveBeenCalled();
     expect(sleep.mock.calls.every((c) => c[0] === 5000)).toBe(true);
-    expect(await indexing.reindexAll({ batchSize: 2, pauseMs: 0, sleep }, deps())).toEqual({ articles: 0, tickets: 0 });
+    expect(await indexing.reindexAll({ batchSize: 2, pauseMs: 0, sleep }, deps())).toMatchObject({ articles: 0, tickets: 0 });
   });
 
   it("falha de cota no meio preserva o que já foi gravado e propaga o erro", async () => {

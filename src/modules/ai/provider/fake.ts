@@ -51,7 +51,14 @@ const draftHandler: Handler = ({ user }) => {
   return { answer: `Com base nas fontes: ${first} [1]`, citations: [1] };
 };
 
-const defaultHandler: Handler = (req) => (req.user.includes("FONTES:") ? draftHandler(req) : triageHandler(req));
+/** Resumo determinístico: cita o começo do primeiro comentário. */
+const summaryHandler: Handler = ({ user }) => {
+  const first = /\[1\] [^:]*: ([^\n]*)/.exec(user)?.[1] ?? "";
+  return { summary: `Resumo da conversa: ${first.slice(0, 80)}` };
+};
+
+const defaultHandler: Handler = (req) =>
+  req.user.includes("FONTES:") ? draftHandler(req) : req.user.includes("COMENTÁRIOS:") ? summaryHandler(req) : triageHandler(req);
 
 export class FakeLLMProvider implements LLMProvider {
   readonly name = "fake" as const;

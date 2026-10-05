@@ -75,6 +75,33 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...base, AI_MODEL_DRAFT: "claude-sonnet-5-5" }).AI_MODEL_DRAFT).toBe("claude-sonnet-5-5");
   });
 
+  it("detecção de duplicados e incidentes: padrões", () => {
+    const c = loadConfig(base);
+    expect(c.AI_DUPLICATE_MIN_SIMILARITY).toBe(0.85);
+    expect(c.AI_DUPLICATE_WINDOW_HOURS).toBe(72);
+    expect(c.AI_INCIDENT_MIN_SIMILARITY).toBe(0.75);
+    expect(c.AI_INCIDENT_WINDOW_MINUTES).toBe(30);
+    expect(c.AI_INCIDENT_MIN_TICKETS).toBe(5);
+  });
+
+  it("similaridades de duplicado e incidente ficam entre 0 e 1", () => {
+    expect(loadConfig({ ...base, AI_DUPLICATE_MIN_SIMILARITY: "0.9" }).AI_DUPLICATE_MIN_SIMILARITY).toBe(0.9);
+    expect(() => loadConfig({ ...base, AI_DUPLICATE_MIN_SIMILARITY: "1.5" })).toThrowError(/AI_DUPLICATE_MIN_SIMILARITY/);
+    expect(() => loadConfig({ ...base, AI_INCIDENT_MIN_SIMILARITY: "-0.1" })).toThrowError(/AI_INCIDENT_MIN_SIMILARITY/);
+  });
+
+  it("mínimo de chamados do incidente é inteiro de 2 para cima; janelas de 1 para cima", () => {
+    expect(loadConfig({ ...base, AI_INCIDENT_MIN_TICKETS: "8" }).AI_INCIDENT_MIN_TICKETS).toBe(8);
+    expect(() => loadConfig({ ...base, AI_INCIDENT_MIN_TICKETS: "1" })).toThrowError(/AI_INCIDENT_MIN_TICKETS/);
+    expect(() => loadConfig({ ...base, AI_DUPLICATE_WINDOW_HOURS: "0" })).toThrowError(/AI_DUPLICATE_WINDOW_HOURS/);
+    expect(() => loadConfig({ ...base, AI_INCIDENT_WINDOW_MINUTES: "0" })).toThrowError(/AI_INCIDENT_WINDOW_MINUTES/);
+  });
+
+  it("modelo do resumo: vazio vira ausente", () => {
+    expect(loadConfig({ ...base, AI_MODEL_SUMMARY: "" }).AI_MODEL_SUMMARY).toBeUndefined();
+    expect(loadConfig({ ...base, AI_MODEL_SUMMARY: "claude-sonnet-5-5" }).AI_MODEL_SUMMARY).toBe("claude-sonnet-5-5");
+  });
+
   it("AUTO_CLOSE_DAYS tem padrão 7 e recusa valores menores que 1", () => {
     expect(loadConfig(base).AUTO_CLOSE_DAYS).toBe(7);
     expect(loadConfig({ ...base, AUTO_CLOSE_DAYS: "3" }).AUTO_CLOSE_DAYS).toBe(3);

@@ -41,6 +41,7 @@ beforeEach(async () => {
   await db.aiAuditLog.deleteMany();
   await db.aiSuggestion.deleteMany();
   await db.ticket.deleteMany();
+  await db.incidentGroup.deleteMany();
   await db.user.deleteMany();
   await db.team.deleteMany();
   teamA = (await db.team.create({ data: { name: "Equipe A" } })).id;
@@ -155,5 +156,24 @@ describe("requestReindex", () => {
   it("não-admin recebe 403 e nada é enfileirado", async () => {
     await expect(ai.requestReindex(agent)).rejects.toMatchObject({ status: 403 });
     expect(await db.auditLog.count({ where: { action: "ai.reindex" } })).toBe(0);
+  });
+});
+
+describe("duplicados e incidentes", () => {
+  it("conta duplicados sugeridos e ignorados e os incidentes detectados e abertos", async () => {
+    const statuses = ["PENDING", "PENDING", "REJECTED"] as const;
+    for (const [i, status] of statuses.entries()) {
+      await db.aiSuggestion.create({ data: { ticketId: ticketIds[i], kind: "DUPLICATE", payload: { candidates: [] }, confidence: 0.9, status } });
+    }
+    await db.aiSuggestion.create({ data: { ticketId: ticketIds[3], kind: "TRIAGE", payload: {}, confidence: 0.9 } }); // outro tipo não conta
+    await db.incidentGroup.create({ data: { title: "A" } });
+    await db.incidentGroup.create({ data: { title: "B" } });
+    await db.incidentGroup.create({ data: { title: "C", status: "CLOSED", closedAt: new Date() } });
+    const o = await ai.getAiOverview(admin, cfg());
+    expect(o.detection).toEqual({ duplicatesSuggested: 3, duplicatesDismissed: 1, incidentsDetected: 3, incidentsOpen: 2 });
+  });
+
+  it("sem dados tudo é zero", async () => {
+    expect((await ai.getAiOverview(admin, cfg())).detection).toEqual({ duplicatesSuggested: 0, duplicatesDismissed: 0, incidentsDetected: 0, incidentsOpen: 0 });
   });
 });

@@ -53,6 +53,14 @@ export default async function AiAdminPage() {
         <ReindexButton />
       </section>
 
+      <section className="flex flex-col gap-2">
+        <h2 className="font-medium">Duplicados e incidentes</h2>
+        <p className="text-sm text-muted-foreground">
+          Duplicados sugeridos: {o.detection.duplicatesSuggested} ({o.detection.duplicatesDismissed} ignorados pelos técnicos) · incidentes
+          detectados: {o.detection.incidentsDetected} ({o.detection.incidentsOpen} em andamento).
+        </p>
+      </section>
+
       <section className="flex flex-col gap-3">
         <h2 className="font-medium">Triagem por equipe</h2>
         {o.teams.map((t) => (

@@ -2,11 +2,12 @@ import type { Priority } from "@/generated/prisma/client";
 import { getConfig, type Config } from "@/lib/config";
 import { enqueue } from "@/lib/queue";
 import { getDb } from "@/lib/db";
-import { ForbiddenError, NotFoundError } from "@/lib/errors";
+import { AppError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { recordAudit } from "@/modules/audit";
 import { can, type SessionUser } from "@/modules/auth";
-import type { TicketWithRefs } from "@/modules/tickets";
+import { TicketNotFoundError, getTicket, type TicketWithRefs } from "@/modules/tickets";
 import { stripCitations, teamAiEnabled, type DraftSourceRef } from "./draft";
+import { realComments } from "./summary";
 import { getEmbeddingProvider } from "./embedding/factory";
 import { defaultTriageModel } from "./pricing";
 import { getLlmProvider } from "./provider/factory";
@@ -93,6 +94,7 @@ export interface AiOverview {
   /** Por que a busca por conhecimento (embeddings) não funciona, quando não funciona. */
   ragReason: string | null;
   knowledge: { articles: number; chunks: number; tickets: number };
+  detection: { duplicatesSuggested: number; duplicatesDismissed: number; incidentsDetected: number; incidentsOpen: number };
   provider: string;
   model: string;
   spentTodayUsd: number;
@@ -129,7 +131,7 @@ export async function getAiOverview(actor: SessionUser, config: OverviewConfig =
 
   const ragReason = getEmbeddingProvider(config) === null ? `Sem chave de API para embeddings (provider ${config.EMBEDDING_PROVIDER}).` : null;
 
-  const [spent, grouped, teams, recent, articles, chunks, indexedTickets] = await Promise.all([
+  const [spent, grouped, teams, recent, articles, chunks, indexedTickets, duplicatesSuggested, duplicatesDismissed, incidentsDetected, incidentsOpen] = await Promise.all([
     db.aiAuditLog.aggregate({ _sum: { costUsd: true }, where: { createdAt: { gte: startOfDay(new Date(), config.APP_TIMEZONE) } } }),
     db.aiSuggestion.groupBy({ by: ["status"], where: { kind: "TRIAGE" }, _count: { _all: true } }),
     db.team.findMany({ select: { id: true, name: true, aiEnabled: true }, orderBy: { name: "asc" } }),
@@ -141,6 +143,10 @@ export async function getAiOverview(actor: SessionUser, config: OverviewConfig =
     db.kbArticle.count({ where: { published: true } }),
     db.$queryRaw<{ n: bigint }[]>`SELECT count(*) AS n FROM "KbChunk"`,
     db.$queryRaw<{ n: bigint }[]>`SELECT count(*) AS n FROM "TicketEmbedding"`,
+    db.aiSuggestion.count({ where: { kind: "DUPLICATE" } }),
+    db.aiSuggestion.count({ where: { kind: "DUPLICATE", status: "REJECTED" } }),
+    db.incidentGroup.count(),
+    db.incidentGroup.count({ where: { status: "OPEN" } }),
   ]);
   const count = (status: string) => grouped.find((g) => g.status === status)?._count._all ?? 0;
   return {
@@ -148,6 +154,7 @@ export async function getAiOverview(actor: SessionUser, config: OverviewConfig =
     reason,
     ragReason,
     knowledge: { articles, chunks: Number(chunks[0].n), tickets: Number(indexedTickets[0].n) },
+    detection: { duplicatesSuggested, duplicatesDismissed, incidentsDetected, incidentsOpen },
     provider: config.LLM_PROVIDER,
     model: config.AI_MODEL_TRIAGE ?? defaultTriageModel(config.LLM_PROVIDER),
     spentTodayUsd: Number(spent._sum.costUsd ?? 0),
@@ -204,4 +211,89 @@ export async function requestReindex(actor: SessionUser): Promise<void> {
     await recordAudit(tx, { actorId: actor.id, action: "ai.reindex", targetType: "ai", targetId: "knowledge", data: {} });
     await enqueue(AI_REINDEX_QUEUE, {}, { tx });
   });
+}
+
+export interface SummaryView {
+  available: boolean;
+  /** Comentários do chamado (sem rascunhos da IA): o botão só vale a partir de 3. */
+  commentCount: number;
+  summary: { text: string; commentCount: number; newComments: number } | null;
+}
+
+type SummaryViewConfig = Pick<Config, "AI_ENABLED" | "LLM_PROVIDER" | "GEMINI_API_KEY" | "ANTHROPIC_API_KEY">;
+
+/** O resumo salvo do chamado e quantos comentários vieram depois dele; só para quem atende o chamado. */
+export async function getSummaryView(actor: SessionUser, ticket: TicketWithRefs, config: SummaryViewConfig = getConfig()): Promise<SummaryView> {
+  if (!can(actor, "ai:decide", ticket)) return { available: false, commentCount: 0, summary: null };
+  const db = getDb();
+  const available = config.AI_ENABLED && getLlmProvider(config) !== null && (await teamAiEnabled(ticket.teamId));
+  const [commentCount, saved] = await Promise.all([
+    db.comment.count({ where: { ticketId: ticket.id, ...realComments } }),
+    db.aiSuggestion.findUnique({ where: { ticketId_kind: { ticketId: ticket.id, kind: "SUMMARY" } } }),
+  ]);
+  if (!saved) return { available, commentCount, summary: null };
+  const payload = saved.payload as { text: string; commentCount: number; lastCommentId: string };
+  const last = await db.comment.findUnique({ where: { id: payload.lastCommentId }, select: { createdAt: true } });
+  const newComments = last
+    ? await db.comment.count({ where: { ticketId: ticket.id, ...realComments, createdAt: { gt: last.createdAt } } })
+    : Math.max(0, commentCount - payload.commentCount);
+  return { available, commentCount, summary: { text: payload.text, commentCount: payload.commentCount, newComments } };
+}
+
+export interface DuplicatesView {
+  id: string;
+  candidates: { id: string; number: number; title: string; status: string; similarity: number; canOpen: boolean }[];
+}
+
+interface DuplicatePayload {
+  candidates: { ticketId: string; number: number; title: string; similarity: number }[];
+}
+
+const OPEN_STATUS = ["NEW", "OPEN", "PENDING"];
+
+/** Os possíveis duplicados do chamado (sugestão pendente), só para quem o atende. Candidato encerrado ou apagado sai. */
+export async function getDuplicatesView(actor: SessionUser, ticket: TicketWithRefs): Promise<DuplicatesView | null> {
+  if (!can(actor, "ai:decide", ticket)) return null;
+  const db = getDb();
+  const s = await db.aiSuggestion.findFirst({ where: { ticketId: ticket.id, kind: "DUPLICATE", status: "PENDING" } });
+  if (!s) return null;
+  const payload = s.payload as unknown as DuplicatePayload;
+  const current = await db.ticket.findMany({
+    where: { id: { in: payload.candidates.map((c) => c.ticketId) } },
+    select: { id: true, number: true, title: true, status: true, requesterId: true, teamId: true, assigneeId: true },
+  });
+  const byId = new Map(current.map((t) => [t.id, t]));
+  const candidates = payload.candidates.flatMap((c) => {
+    const t = byId.get(c.ticketId);
+    if (!t || !OPEN_STATUS.includes(t.status)) return [];
+    const canOpen = can(actor, "ticket:read", t as never);
+    // Chamado que o técnico não pode abrir (ex.: o chamado mudou de equipe) aparece sem o título.
+    return [{ id: t.id, number: t.number, title: canOpen ? t.title : "Chamado de outra equipe", status: t.status, similarity: c.similarity, canOpen }];
+  });
+  return candidates.length === 0 ? null : { id: s.id, candidates };
+}
+
+/** Ids dos chamados da lista com possível duplicado pendente que o usuário pode decidir (uma consulta só). */
+export async function duplicateTicketIds(actor: SessionUser, tickets: TicketWithRefs[]): Promise<Set<string>> {
+  const decidable = tickets.filter((t) => can(actor, "ai:decide", t));
+  if (decidable.length === 0) return new Set();
+  const rows = await getDb().aiSuggestion.findMany({
+    where: { ticketId: { in: decidable.map((t) => t.id) }, kind: "DUPLICATE", status: "PENDING" },
+    select: { ticketId: true },
+  });
+  return new Set(rows.map((r) => r.ticketId));
+}
+
+/** "Não é duplicado": descarta a sugestão. Decisão única; nada é vinculado nem mesclado. */
+export async function dismissDuplicates(actor: SessionUser, ticketId: string): Promise<void> {
+  const ticket = await getTicket(actor, ticketId);
+  if (!ticket || !can(actor, "ai:decide", ticket)) throw new TicketNotFoundError();
+  const db = getDb();
+  const s = await db.aiSuggestion.findUnique({ where: { ticketId_kind: { ticketId, kind: "DUPLICATE" } } });
+  if (!s) throw new AppError(404, "Sugestão não encontrada.");
+  const claimed = await db.aiSuggestion.updateMany({
+    where: { id: s.id, status: "PENDING" },
+    data: { status: "REJECTED", decidedById: actor.id, decidedAt: new Date() },
+  });
+  if (claimed.count !== 1) throw new AppError(409, "Esta sugestão já foi decidida.");
 }

@@ -19,12 +19,18 @@ describe("menu lateral", () => {
   });
 
   it("gestor de equipe também vê o Dashboard", () => {
-    expect(labels("TEAM_LEAD")).toEqual(["Chamados", "Novo chamado", "Base de conhecimento", "Dashboard"]);
-    expect(buildNavItems(user("TEAM_LEAD")).at(-1)?.href).toBe("/dashboard");
+    expect(labels("TEAM_LEAD")).toEqual(["Chamados", "Novo chamado", "Base de conhecimento", "Dashboard", "Incidentes"]);
+    expect(buildNavItems(user("TEAM_LEAD")).find((i) => i.label === "Dashboard")?.href).toBe("/dashboard");
   });
 
   it("admin vê Dashboard e Administração, apontando para /admin", () => {
-    expect(labels("ADMIN")).toEqual(["Chamados", "Novo chamado", "Base de conhecimento", "Dashboard", "Administração"]);
+    expect(labels("ADMIN")).toEqual(["Chamados", "Novo chamado", "Base de conhecimento", "Dashboard", "Incidentes", "Administração"]);
     expect(buildNavItems(user("ADMIN")).at(-1)?.href).toBe("/admin");
+  });
+
+  it("Incidentes aponta para /incidentes e só aparece para líder e admin", () => {
+    expect(buildNavItems(user("TEAM_LEAD")).find((i) => i.label === "Incidentes")?.href).toBe("/incidentes");
+    expect(labels("AGENT")).not.toContain("Incidentes");
+    expect(labels("REQUESTER")).not.toContain("Incidentes");
   });
 });

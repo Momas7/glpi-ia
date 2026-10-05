@@ -60,6 +60,25 @@ Antes de qualquer texto sair para o LLM, o sistema troca por tokens reversíveis
 
 `npm run ai:eval:rag` roda 30 perguntas contra 12 artigos fictícios e mede se a fonte certa aparece no top 3 e se perguntas sem artigo ficam abaixo do limiar (fora do CI, consome cota; com `fake` só valida o script).
 
+
+## Duplicados, incidentes e resumo (Fase 5)
+
+**Possíveis duplicados.** Cada chamado novo ganha um vetor (título e descrição, mascarados) que fica guardado enquanto o chamado está aberto. O sistema compara com os chamados abertos **da mesma equipe** das últimas 72 horas e, se algum passar de `AI_DUPLICATE_MIN_SIMILARITY` (0,85), mostra ao técnico o cartão *Possíveis duplicados* (até 3, com link só para os que ele pode abrir) e o selo "Possível duplicado" na lista. O técnico só pode ignorar (**Não é duplicado**): nada é vinculado, mesclado ou fechado.
+
+**Incidente em massa.** Se `AI_INCIDENT_MIN_TICKETS` (5) ou mais chamados abertos, **de qualquer equipe**, parecidos entre si (`AI_INCIDENT_MIN_SIMILARITY`, 0,75) chegarem em `AI_INCIDENT_WINDOW_MINUTES` (30), o sistema cria um **incidente**: uma faixa vermelha aparece para líderes e admins, a página *Incidentes* lista os chamados agrupados e o n8n recebe o evento `incident.detected` (uma vez por incidente; veja [integracao-n8n.md](integracao-n8n.md)). Novos chamados parecidos entram no mesmo grupo. O incidente fecha sozinho quando todos os chamados dele terminam, ou à mão (*Encerrar incidente*). O líder só vê incidentes que tenham chamado de uma equipe dele e, na página, só os chamados que pode abrir.
+
+**Resumo da conversa.** No chamado, a equipe clica em **Resumir conversa** (a partir de 3 comentários). Notas internas entram no resumo, que só a equipe vê. Se a conversa avançar, o cartão avisa "há N comentários novos" e oferece **Atualizar resumo**. Rascunhos da IA não contam.
+
+| Variável | Padrão | Para quê |
+|---|---|---|
+| `AI_DUPLICATE_MIN_SIMILARITY` / `AI_DUPLICATE_WINDOW_HOURS` | `0.85` / `72` | Limiar e janela dos duplicados. |
+| `AI_INCIDENT_MIN_SIMILARITY` / `AI_INCIDENT_WINDOW_MINUTES` / `AI_INCIDENT_MIN_TICKETS` | `0.75` / `30` / `5` | Quando vários chamados viram incidente. |
+| `AI_MODEL_SUMMARY` | o modelo do rascunho | Modelo do resumo. |
+
+**Calibração.** Os padrões são conservadores. Com a chave real, rode `npm run ai:eval:dup`: ele compara ~40 pares rotulados (duplicados, quase duplicados e diferentes), mostra precisão, duplicados pegos e os erros, e sugere o limiar de melhor F1. Ajuste as duas variáveis de similaridade a partir dele (o limiar do incidente costuma ser um pouco menor que o de duplicados, porque descrições de uma queda geral variam mais).
+
+**Limites.** O aviso é auxiliar: descrições vagas ("não funciona") geram vetores distantes e podem esconder um incidente. Um pico de chamados pode esgotar a cota de embeddings; nesse caso o chamado é criado normalmente, só fica sem vetor. Chamados de equipes com a IA desligada ficam fora de tudo isso.
+
 ## Medir a qualidade
 
 `npm run ai:eval` roda 40 chamados rotulados (`tests/ai-eval/dataset.json`, incluindo casos ambíguos, injeção de prompt e dados sensíveis) contra o provider configurado e imprime o acerto de categoria, prioridade e equipe, o custo estimado e os erros. Com provider real ele espera 6 s entre os casos (planos gratuitos limitam por minuto; ajuste com `AI_EVAL_DELAY_MS`) e repete em erro temporário. Fica fora do CI de propósito: chama o provider escolhido, custa dinheiro e o resultado varia. Com `LLM_PROVIDER=fake` o resultado só valida o funcionamento do script (as regras do fake são por palavra-chave e acertam pouco).

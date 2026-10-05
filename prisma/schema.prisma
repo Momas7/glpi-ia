@@ -101,6 +101,7 @@ model User {
   kbCreated      KbArticle[]     @relation("KbCreatedBy")
   kbUpdated      KbArticle[]     @relation("KbUpdatedBy")
   apiKeys        ApiKey[]
+  incidentGroups IncidentGroup[]
 }
 
 model Session {
@@ -173,11 +174,15 @@ model Ticket {
   apiKey      ApiKey?      @relation(fields: [apiKeyId], references: [id])
   externalRef String?
 
-  aiSuggestions AiSuggestion[]
+  aiSuggestions   AiSuggestion[]
   /// Solução escrita ao marcar como Resolvido (obrigatória); alimenta a base de conhecimento.
-  resolution    String?
-  rating        TicketRating?
-  embedding     TicketEmbedding?
+  resolution      String?
+  rating          TicketRating?
+  embedding       TicketEmbedding?
+  /// Vetor enquanto o chamado está aberto (duplicados e incidentes); some ao resolver/fechar.
+  openVector      OpenTicketVector?
+  incidentGroupId String?
+  incidentGroup   IncidentGroup?    @relation(fields: [incidentGroupId], references: [id], onDelete: SetNull)
 
   // SLA (minutos úteis; prazos sempre recalculados a partir da criação)
   slaFirstResponseMinutes      Int?
@@ -205,6 +210,7 @@ model Ticket {
   @@index([resolvedAt])
   @@index([firstRespondedAt])
   @@index([requesterId])
+  @@index([incidentGroupId])
 }
 
 model Comment {
@@ -332,6 +338,8 @@ model Holiday {
 
 enum AiSuggestionKind {
   TRIAGE
+  DUPLICATE
+  SUMMARY
 }
 
 enum AiSuggestionStatus {
@@ -438,4 +446,32 @@ model TicketEmbedding {
   contentHash String
   embedding   Unsupported("vector(768)")
   indexedAt   DateTime                   @default(now())
+}
+
+enum IncidentStatus {
+  OPEN
+  CLOSED
+}
+
+/// Muitos chamados parecidos em pouco tempo (queda geral). Fecha sozinho quando todos terminam, ou à mão.
+model IncidentGroup {
+  id         String         @id @default(cuid())
+  title      String
+  status     IncidentStatus @default(OPEN)
+  detectedAt DateTime       @default(now())
+  closedAt   DateTime?
+  closedById String?
+  closedBy   User?          @relation(fields: [closedById], references: [id])
+  tickets    Ticket[]
+
+  @@index([status])
+}
+
+/// Vetor de um chamado aberto (título + descrição). Coluna `embedding` só por SQL cru.
+model OpenTicketVector {
+  ticketId    String                     @id
+  ticket      Ticket                     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  contentHash String
+  embedding   Unsupported("vector(768)")
+  createdAt   DateTime                   @default(now())
 }

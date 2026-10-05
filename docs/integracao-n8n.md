@@ -74,6 +74,7 @@ Os eventos de chamado trazem só o necessário para notificar. **A descrição d
 | `comment.created` | Comentário público (notas internas nunca geram aviso) | formato próprio: `{ ticket, commentId, author: { name, email } }` |
 | `sla.warning` | Chamado com 80% do prazo de resolução consumido | (a partir do bloco de SLA) |
 | `sla.breached` | Prazo de resolução vencido | (a partir do bloco de SLA) |
+| `incident.detected` | Cinco ou mais chamados parecidos chegaram em pouco tempo (queda geral); uma vez por incidente | formato próprio: `{ id, title, ticketCount, teams, url, detectedAt }`; nunca traz descrição de chamado |
 | `auth.invite_created` | Admin convidou alguém | formato próprio: `{ email, role, url, expiresAt }` |
 | `auth.password_reset_requested` | Alguém pediu para redefinir a senha | formato próprio: `{ email, name, url, expiresAt }` |
 
