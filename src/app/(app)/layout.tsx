@@ -1,38 +1,17 @@
-import Link from "next/link";
-import { LogoutButton } from "@/components/forms/LogoutButton";
+import { AppSidebar } from "@/components/AppSidebar";
 import { ROLE_LABEL } from "@/lib/labels";
+import { buildNavItems } from "@/lib/nav";
 import { requireUser } from "@/lib/server-session";
 
 // Telas de trabalho (lista e detalhe) ficam sem fundos animados, de propósito.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between border-b border-white/10 px-6 py-3">
-        <nav className="flex items-center gap-5 text-sm">
-          <Link href="/tickets" className="font-semibold">
-            Chamados IA
-          </Link>
-          <Link href="/tickets" className="text-muted-foreground hover:text-foreground">
-            Chamados
-          </Link>
-          <Link href="/tickets/new" className="text-muted-foreground hover:text-foreground">
-            Novo chamado
-          </Link>
-          {user.role === "ADMIN" && (
-            <Link href="/admin" className="text-muted-foreground hover:text-foreground">
-              Administração
-            </Link>
-          )}
-        </nav>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <span>
-            {user.name} · {ROLE_LABEL[user.role]}
-          </span>
-          <LogoutButton />
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 p-6">{children}</main>
+    <div className="flex min-h-screen flex-1 flex-col md:flex-row">
+      <AppSidebar items={buildNavItems(user)} userName={user.name} roleLabel={ROLE_LABEL[user.role]} />
+      <main className="min-w-0 flex-1 p-6">
+        <div className="mx-auto w-full max-w-6xl">{children}</div>
+      </main>
     </div>
   );
 }

@@ -1,0 +1,25 @@
+import { describe, expect, it } from "vitest";
+import { APP_NAME, buildNavItems } from "@/lib/nav";
+
+const user = (role: "REQUESTER" | "AGENT" | "TEAM_LEAD" | "ADMIN") => ({ id: "u", name: "U", email: "u@x.com", role, teamIds: [] });
+const labels = (role: Parameters<typeof user>[0]) => buildNavItems(user(role)).map((i) => i.label);
+
+describe("menu lateral", () => {
+  it("o nome do sistema é Sistema de Chamados", () => {
+    expect(APP_NAME).toBe("Sistema de Chamados");
+  });
+
+  it("solicitante e técnico veem Chamados e Novo chamado", () => {
+    expect(labels("REQUESTER")).toEqual(["Chamados", "Novo chamado"]);
+    expect(labels("AGENT")).toEqual(["Chamados", "Novo chamado"]);
+  });
+
+  it("gestor de equipe vê os mesmos itens (o Dashboard entra com o bloco 4)", () => {
+    expect(labels("TEAM_LEAD")).toEqual(["Chamados", "Novo chamado"]);
+  });
+
+  it("admin também vê Administração, apontando para /admin", () => {
+    expect(labels("ADMIN")).toEqual(["Chamados", "Novo chamado", "Administração"]);
+    expect(buildNavItems(user("ADMIN")).at(-1)?.href).toBe("/admin");
+  });
+});

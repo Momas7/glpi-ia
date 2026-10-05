@@ -1,6 +1,6 @@
 import { JsonForm } from "@/components/forms/JsonForm";
 
-export const metadata = { title: "Aceitar convite · Chamados IA" };
+export const metadata = { title: "Aceitar convite · Sistema de Chamados" };
 
 export default async function AcceptInvitePage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
   const { token } = await searchParams;

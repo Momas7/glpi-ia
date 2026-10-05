@@ -1,6 +1,6 @@
 import { JsonForm } from "@/components/forms/JsonForm";
 
-export const metadata = { title: "Nova senha · Chamados IA" };
+export const metadata = { title: "Nova senha · Sistema de Chamados" };
 
 export default async function ResetPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
   const { token } = await searchParams;
