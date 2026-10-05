@@ -16,7 +16,8 @@ export type Action =
   | "ticket:take"
   | "ticket:reopen"
   | "ticket:confirm"
-  | "admin:manage";
+  | "admin:manage"
+  | "dashboard:view";
 
 export interface TicketResource {
   requesterId?: string;
@@ -40,6 +41,8 @@ export function can(user: SessionUser, action: Action, resource?: TicketResource
     case "user:manage":
     case "admin:manage":
       return false;
+    case "dashboard:view":
+      return user.role === "TEAM_LEAD";
     case "ticket:take":
       return isStaff(user) && inMyTeam(user, resource) && !resource?.assigneeId;
     case "ticket:read":

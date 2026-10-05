@@ -84,6 +84,16 @@ describe("prazos", () => {
     expect(t.resolutionDue).toEqual(sp(8, 13));
   });
 
+  it("sair de Pendente zera as marcas de alerta (o prazo foi empurrado)", async () => {
+    const id = await ticketAt(sp(5, 9));
+    await status(id, "NEW", "OPEN", sp(5, 9, 30));
+    await db.ticket.update({ where: { id }, data: { slaWarnedAt: sp(5, 11), slaBreachedAt: sp(5, 12) } });
+    await status(id, "OPEN", "PENDING", sp(5, 12, 30));
+    await status(id, "PENDING", "OPEN", sp(6, 9));
+    const t = await row(id);
+    expect([t.slaWarnedAt, t.slaBreachedAt]).toEqual([null, null]);
+  });
+
   it("resolver grava o tempo real; reabrir conta o tempo resolvido como pausa e zera os alertas", async () => {
     const id = await ticketAt(sp(5, 9));
     await status(id, "NEW", "OPEN", sp(5, 9, 30));

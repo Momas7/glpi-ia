@@ -1,7 +1,8 @@
 import { createDb, type Db } from "../src/lib/db";
 import { hashPassword } from "../src/modules/auth/password";
 import { nationalHolidays } from "../src/modules/sla/holidays";
-import { invalidateCalendarCache, slaOnCreate } from "../src/modules/sla/service";
+import { addBusinessMinutes } from "../src/modules/sla/calendar";
+import { invalidateCalendarCache, loadCalendar, slaOnCreate } from "../src/modules/sla/service";
 
 // Dados 100% fictícios. Nada aqui vem de uma empresa real.
 const TEAMS = ["Infraestrutura", "Suporte N1", "Sistemas"] as const;
@@ -72,6 +73,88 @@ const DEMO_TICKETS: [string, string, string, Priority, "INCIDENT" | "REQUEST", S
   ["Instalação de leitor de PDF", "Preciso editar documentos PDF.", "Software", "LOW", "REQUEST", "NEW"],
 ];
 
+const HISTORY_COUNT = 180;
+const HISTORY_SUBJECTS = [
+  "Impressora travada", "Acesso ao sistema", "Troca de periférico", "Lentidão na rede", "Senha expirada",
+  "Instalação de software", "Erro ao emitir relatório", "Wi-Fi instável", "Pedido de licença", "Falha no e-mail",
+  "VPN não conecta", "Monitor sem imagem", "Permissão em pasta", "Atualização pendente", "Telefone sem sinal",
+];
+
+/** Gerador pseudoaleatório com semente fixa: o histórico fictício é sempre o mesmo para o mesmo índice. */
+function rng(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * ~180 chamados fictícios resolvidos nos últimos 6 meses (com ~80% dentro do prazo) para o dashboard ter o que
+ * mostrar. Idempotente por título; os prazos vêm das mesmas funções de SLA do sistema.
+ */
+async function seedHistory(db: Db, people: { agentId: string; requesterId: string }): Promise<void> {
+  const existing = new Set(
+    (await db.ticket.findMany({ where: { title: { startsWith: "Histórico " } }, select: { title: true } })).map((t) => t.title),
+  );
+  if (existing.size >= HISTORY_COUNT) return;
+  const cal = await loadCalendar(db);
+  const policies = new Map((await db.slaPolicy.findMany()).map((p) => [p.priority, p]));
+  const categories = await db.category.findMany({ where: { parentId: null } });
+  const DAY = 86_400_000;
+  const now = Date.now();
+  const priorities = ["LOW", "LOW", "LOW", "MEDIUM", "MEDIUM", "MEDIUM", "MEDIUM", "MEDIUM", "HIGH", "HIGH", "CRITICAL"] as const;
+
+  for (let i = 0; i < HISTORY_COUNT; i++) {
+    const title = `Histórico ${i + 1}: ${HISTORY_SUBJECTS[i % HISTORY_SUBJECTS.length]}`;
+    if (existing.has(title)) continue;
+    const r = rng(1000 + i);
+    const priority = priorities[Math.floor(r() * priorities.length)];
+    const policy = policies.get(priority);
+    if (!policy) continue;
+    const createdAt = new Date(now - (8 + r() * 172) * DAY); // entre 8 e 180 dias atrás: o prazo já passou
+    const category = categories[Math.floor(r() * categories.length)];
+
+    const late = r() < 0.2;
+    const resolutionBM = Math.max(5, Math.round(policy.resolutionMinutes * (late ? 1.05 + r() * 0.55 : 0.2 + r() * 0.75)));
+    const firstBM = Math.max(1, Math.min(resolutionBM, Math.round(policy.firstResponseMinutes * (0.1 + r() * 0.9))));
+    const resolvedAt = addBusinessMinutes(createdAt, resolutionBM, cal);
+    const firstRespondedAt = addBusinessMinutes(createdAt, firstBM, cal);
+    const closed = r() < 0.7;
+
+    await db.$transaction(async (tx) => {
+      const ticket = await tx.ticket.create({
+        data: {
+          title,
+          description: "Chamado fictício do histórico de demonstração.",
+          priority,
+          type: r() < 0.6 ? "INCIDENT" : "REQUEST",
+          status: closed ? "CLOSED" : "RESOLVED",
+          requesterId: people.requesterId,
+          assigneeId: people.agentId,
+          categoryId: category?.id,
+          teamId: category?.defaultTeamId,
+          createdAt,
+        },
+      });
+      await slaOnCreate(tx, ticket.id, createdAt);
+      await tx.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          resolvedAt,
+          closedAt: closed ? new Date(resolvedAt.getTime() + DAY) : null,
+          firstRespondedAt,
+          firstResponseBusinessMinutes: firstBM,
+          resolutionBusinessMinutes: resolutionBM,
+          pausedAt: null,
+        },
+      });
+    });
+  }
+}
+
 /** Usuários e chamados demo. Só roda com SEED_DEMO_PASSWORD definida (nunca com senha no código). */
 async function seedDemo(db: Db, teamIds: Map<string, string>): Promise<void> {
   const password = process.env.SEED_DEMO_PASSWORD;
@@ -131,6 +214,31 @@ async function seedDemo(db: Db, teamIds: Map<string, string>): Promise<void> {
     }
   }
   void admin;
+  await seedHistory(db, { agentId: agent.id, requesterId: requester.id });
+}
+
+const SLA_POLICIES = [
+  { priority: "CRITICAL", firstResponseMinutes: 60, resolutionMinutes: 240 },
+  { priority: "HIGH", firstResponseMinutes: 120, resolutionMinutes: 480 },
+  { priority: "MEDIUM", firstResponseMinutes: 240, resolutionMinutes: 1440 },
+  { priority: "LOW", firstResponseMinutes: 480, resolutionMinutes: 2400 },
+] as const;
+
+/** Política padrão, expediente seg–sex 8h–18h e feriados nacionais do ano corrente e dos 2 seguintes. */
+async function seedSla(db: Db): Promise<void> {
+  for (const p of SLA_POLICIES) {
+    await db.slaPolicy.upsert({ where: { priority: p.priority }, update: {}, create: p });
+  }
+  for (const weekday of [1, 2, 3, 4, 5]) {
+    await db.businessHours.upsert({ where: { weekday }, update: {}, create: { weekday, startMinute: 480, endMinute: 1080 } });
+  }
+  const year = new Date().getFullYear();
+  for (const y of [year, year + 1, year + 2]) {
+    for (const h of nationalHolidays(y)) {
+      const date = new Date(`${h.date}T00:00:00Z`);
+      await db.holiday.upsert({ where: { date }, update: {}, create: { date, name: h.name } });
+    }
+  }
 }
 
 const SLA_POLICIES = [
