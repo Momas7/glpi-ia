@@ -72,6 +72,10 @@ Registro do que ficou adiado nas revisões independentes e das decisões que mud
 - Feriado com data inexistente (ex.: 2026-02-30) enviado pela API vira outra data.
 - Testes: pausa só com `pausedAt` preenchido à mão; teste de horário de verão fora do expediente; total fixo de feriados no teste do seed; E2E "Vencidos" depende da hora.
 
+## Dependências de desenvolvimento com aviso de segurança
+
+- `braces` (GHSA-vfj7-8cjw-p6xm, negação de serviço por padrões aninhados, severidade alta) não tem versão corrigida (a última, 3.0.3, é a afetada). Entra só por ferramentas de desenvolvimento (CLI do `shadcn` e `eslint-config-next`, via `fast-glob`/`micromatch`). O `shadcn` foi movido para `devDependencies` e o job `audit` do CI audita só as dependências de produção (`--omit=dev`). Rever quando houver versão corrigida do `braces` ou das ferramentas que o usam.
+
 ## Decisões de produto/segurança não resolvidas
 
 - Bloqueio de conta por 5 falhas permite que terceiros bloqueiem um colega repetidamente (negação de serviço). Mitigar (bloqueio por IP+conta, atraso progressivo) é decisão de produto.

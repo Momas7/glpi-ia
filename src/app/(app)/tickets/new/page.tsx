@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { PRIORITY_LABEL, TYPE_LABEL } from "@/lib/labels";
 import { requireUser } from "@/lib/server-session";
 
-export const metadata = { title: "Novo chamado · Chamados IA" };
+export const metadata = { title: "Novo chamado · Sistema de Chamados" };
 
 const toOptions = (labels: Record<string, string>) =>
   Object.entries(labels).map(([value, label]) => ({ value, label }));

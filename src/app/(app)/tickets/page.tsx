@@ -9,7 +9,7 @@ import { requireUser } from "@/lib/server-session";
 import { loadCalendar, slaState } from "@/modules/sla";
 import { listQuerySchema, listTickets } from "@/modules/tickets";
 
-export const metadata = { title: "Chamados · Chamados IA" };
+export const metadata = { title: "Chamados · Sistema de Chamados" };
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
