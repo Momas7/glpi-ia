@@ -90,7 +90,7 @@ describe("queryKpis", () => {
     const base = await kpis(); // chamados do fixture + este (aberto)
 
     await svc.changeStatus(agent, created.id, "OPEN");
-    await svc.changeStatus(agent, created.id, "RESOLVED");
+    await svc.changeStatus(agent, created.id, "RESOLVED", "Solução de teste do chamado.");
     const resolved = await kpis();
     expect(resolved.slaPercent).toBe(100);
     expect(resolved.openNow).toBe(base.openNow - 1);
@@ -100,7 +100,7 @@ describe("queryKpis", () => {
     expect(reopened.slaPercent).toBeNull(); // reaberto não conta como resolvido
     expect(reopened.openNow).toBe(base.openNow);
 
-    await svc.changeStatus(agent, created.id, "RESOLVED");
+    await svc.changeStatus(agent, created.id, "RESOLVED", "Solução de teste do chamado.");
     const again = await kpis();
     expect(again.slaPercent).toBe(100);
     expect(again.openNow).toBe(base.openNow - 1);

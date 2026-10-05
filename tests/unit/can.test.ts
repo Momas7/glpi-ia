@@ -163,3 +163,36 @@ describe("can: ai:decide", () => {
     expect(can(user("AGENT"), "ai:decide")).toBe(false);
   });
 });
+
+describe("can: base de conhecimento", () => {
+  it("kb:read vale para equipe e admin, nunca para solicitante", () => {
+    for (const role of ["AGENT", "TEAM_LEAD", "ADMIN"] as Role[]) expect(can(user(role), "kb:read"), role).toBe(true);
+    expect(can(user("REQUESTER"), "kb:read")).toBe(false);
+  });
+  it("kb:manage vale para líder e admin, não para técnico nem solicitante", () => {
+    expect(can(user("TEAM_LEAD"), "kb:manage")).toBe(true);
+    expect(can(user("ADMIN"), "kb:manage")).toBe(true);
+    expect(can(user("AGENT"), "kb:manage")).toBe(false);
+    expect(can(user("REQUESTER"), "kb:manage")).toBe(false);
+  });
+});
+
+describe("can: ticket:rate", () => {
+  const mine = { requesterId: "u1", teamId: "t1", assigneeId: null };
+  it("só o solicitante do chamado, em Resolvido ou Fechado", () => {
+    const requester = user("REQUESTER");
+    expect(can(requester, "ticket:rate", { ...mine, status: "RESOLVED" })).toBe(true);
+    expect(can(requester, "ticket:rate", { ...mine, status: "CLOSED" })).toBe(true);
+    expect(can(requester, "ticket:rate", { ...mine, status: "OPEN" })).toBe(false);
+    expect(can(requester, "ticket:rate", { ...mine, requesterId: "outro", status: "RESOLVED" })).toBe(false);
+    expect(can(requester, "ticket:rate")).toBe(false);
+  });
+  it("nem técnico, nem líder, nem admin avaliam em nome do solicitante", () => {
+    for (const role of ["AGENT", "TEAM_LEAD", "ADMIN"] as Role[]) {
+      expect(can(user(role, "staff"), "ticket:rate", { ...mine, status: "RESOLVED" }), role).toBe(false);
+    }
+  });
+  it("técnico que abriu o próprio chamado pode avaliá-lo (é o solicitante)", () => {
+    expect(can(user("AGENT", "u1"), "ticket:rate", { ...mine, status: "CLOSED" })).toBe(true);
+  });
+});

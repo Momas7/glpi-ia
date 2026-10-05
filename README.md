@@ -12,6 +12,7 @@ Sistema de chamados no estilo GLPI com automações de IA: triagem automática, 
 - **IA:** camada `LLMProvider` trocável por variável de ambiente (Gemini em desenvolvimento, Claude em produção).
 - **Integração com o n8n:** avisos assinados de tudo que acontece nos chamados e API para o n8n abrir chamados (ex.: e-mail vira chamado). Guia em [docs/integracao-n8n.md](docs/integracao-n8n.md).
 - **Triagem por IA:** cada chamado novo recebe uma sugestão de categoria, prioridade e equipe (Gemini em desenvolvimento, Claude em produção, trocados por uma variável). A IA só sugere, o técnico decide; dados sensíveis são mascarados antes de sair e tudo é auditado. Guia em [docs/ia.md](docs/ia.md).
+- **Base de conhecimento e RAG:** artigos escritos no sistema e chamados já resolvidos (com solução obrigatória) viram fontes de um rascunho de resposta com citações, sob demanda; o solicitante avalia o atendimento de 1 a 5 estrelas. Guia em [docs/ia.md](docs/ia.md).
 - **Segurança:** dados sensíveis mascarados antes do LLM, log de auditoria de toda chamada de IA, a IA nunca fecha chamado sozinha.
 
 ## Arquitetura

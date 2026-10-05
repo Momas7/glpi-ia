@@ -1,0 +1,50 @@
+[
+  {
+    "title": "Wi-Fi sem conexão",
+    "body": "Se o Wi-Fi do andar não conecta, reinicie o ponto de acesso (botão traseiro por 10 segundos), aguarde 3 minutos e confira se o cabo de rede do ponto está firme. Se persistir, abra um chamado informando o andar e o horário em que a queda começou."
+  },
+  {
+    "title": "Impressora não imprime",
+    "body": "Quando a fila de impressão trava, abra Serviços, reinicie o serviço Spooler de impressão e limpe a pasta de spool. Confirme que a impressora está ligada e com papel. Para impressoras de rede, imprima uma página de teste pelo painel."
+  },
+  {
+    "title": "Redefinir senha esquecida",
+    "body": "Para redefinir a senha esquecida, use o link Esqueci minha senha na tela de entrada. O link chega ao e-mail corporativo e vale por 1 hora. A nova senha precisa ter 12 caracteres ou mais e não pode ser uma senha comum."
+  },
+  {
+    "title": "Configurar a VPN para trabalho remoto",
+    "body": "Instale o cliente de VPN homologado, entre com seu usuário e senha e escolha o perfil Matriz. Se a VPN cair a cada poucos minutos, troque o protocolo para TCP nas configurações avançadas e desative o modo de economia de energia da placa de rede."
+  },
+  {
+    "title": "E-mail não sincroniza no celular",
+    "body": "Se o e-mail parou de chegar no celular, remova a conta do aplicativo e adicione de novo com o endereço corporativo. Confira se a senha foi trocada recentemente, pois o celular continua usando a antiga e a conta é bloqueada."
+  },
+  {
+    "title": "Backup e restauração de arquivos",
+    "body": "Os arquivos da pasta de rede têm cópia diária. Para restaurar um arquivo apagado ou uma versão anterior, abra um chamado informando o caminho e a data aproximada. A restauração leva até 4 horas úteis."
+  },
+  {
+    "title": "Computador lento",
+    "body": "Para um computador lento, feche programas que não usa, reinicie a máquina e verifique se há atualizações pendentes. Confira o espaço livre no disco: abaixo de 10% o sistema fica lento. Se continuar, abra um chamado com o nome do equipamento."
+  },
+  {
+    "title": "Acesso a pastas compartilhadas",
+    "body": "Para pedir acesso a uma pasta compartilhada, o gestor da área precisa aprovar. Abra um chamado de acesso informando o caminho da pasta e o tipo de permissão desejado: leitura ou leitura e escrita. O prazo é de 1 dia útil."
+  },
+  {
+    "title": "Teams sem áudio nas chamadas",
+    "body": "Se ninguém ouve você no Teams, abra as configurações de dispositivos, escolha o microfone correto e faça uma chamada de teste. Verifique se o microfone não está mudo no fone e se o Windows permite o acesso do Teams ao microfone."
+  },
+  {
+    "title": "Instalar software autorizado",
+    "body": "Programas homologados são instalados pela Central de Software. Para um programa que não está na lista, abra um chamado com o nome, a versão e a justificativa. A TI avalia licença e segurança antes de instalar."
+  },
+  {
+    "title": "Conta bloqueada por tentativas erradas",
+    "body": "Após 5 tentativas erradas a conta é bloqueada por 15 minutos. Aguarde ou peça o desbloqueio à Central de Atendimento. Evite continuar tentando: senhas antigas salvas em celulares e programas são a causa mais comum."
+  },
+  {
+    "title": "Trocar equipamento com defeito",
+    "body": "Para trocar teclado, mouse, monitor ou cabo com defeito, abra um chamado de hardware informando o patrimônio do equipamento. Itens de estoque são trocados no mesmo dia; equipamentos maiores passam por avaliação técnica."
+  }
+]

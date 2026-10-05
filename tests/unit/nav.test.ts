@@ -9,18 +9,22 @@ describe("menu lateral", () => {
     expect(APP_NAME).toBe("Sistema de Chamados");
   });
 
-  it("solicitante e técnico veem Chamados e Novo chamado", () => {
+  it("solicitante vê Chamados e Novo chamado, sem a base de conhecimento", () => {
     expect(labels("REQUESTER")).toEqual(["Chamados", "Novo chamado"]);
-    expect(labels("AGENT")).toEqual(["Chamados", "Novo chamado"]);
+  });
+
+  it("técnico também vê a Base de conhecimento", () => {
+    expect(labels("AGENT")).toEqual(["Chamados", "Novo chamado", "Base de conhecimento"]);
+    expect(buildNavItems(user("AGENT")).at(-1)?.href).toBe("/kb");
   });
 
   it("gestor de equipe também vê o Dashboard", () => {
-    expect(labels("TEAM_LEAD")).toEqual(["Chamados", "Novo chamado", "Dashboard"]);
+    expect(labels("TEAM_LEAD")).toEqual(["Chamados", "Novo chamado", "Base de conhecimento", "Dashboard"]);
     expect(buildNavItems(user("TEAM_LEAD")).at(-1)?.href).toBe("/dashboard");
   });
 
   it("admin vê Dashboard e Administração, apontando para /admin", () => {
-    expect(labels("ADMIN")).toEqual(["Chamados", "Novo chamado", "Dashboard", "Administração"]);
+    expect(labels("ADMIN")).toEqual(["Chamados", "Novo chamado", "Base de conhecimento", "Dashboard", "Administração"]);
     expect(buildNavItems(user("ADMIN")).at(-1)?.href).toBe("/admin");
   });
 });

@@ -80,7 +80,7 @@ describe("avisos de chamado", () => {
   it("transições, reabrir, confirmar e fechamento automático enfileiram ticket.status_changed com from/to", async () => {
     const t = await newTicket();
     await svc.changeStatus(agent, t.id, "OPEN");
-    await svc.changeStatus(agent, t.id, "RESOLVED");
+    await svc.changeStatus(agent, t.id, "RESOLVED", "Solução de teste do chamado.");
     const own = await svc.createTicket(req, { title: "Do solicitante", description: DESCRIPTION });
     await db.ticket.update({ where: { id: own.id }, data: { status: "RESOLVED", resolvedAt: new Date() } });
     await svc.reopenTicket(req, own.id, "Voltou a acontecer");
