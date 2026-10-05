@@ -21,6 +21,17 @@ const schema = z.object({
   TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).default(1),
   DEFAULT_INTAKE_TEAM: z.string().min(1).default("Suporte N1"),
   AUTO_CLOSE_DAYS: z.coerce.number().int().min(1).default(7),
+  APP_TIMEZONE: z
+    .string()
+    .default("America/Sao_Paulo")
+    .refine((tz) => {
+      try {
+        new Intl.DateTimeFormat("pt-BR", { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "fuso horário inválido"),
   // O Compose repassa variáveis não definidas como "": tratar como ausentes.
   N8N_WEBHOOK_URL: z.preprocess((v) => (v === "" ? undefined : v), z.string().url().optional()),
   N8N_WEBHOOK_SECRET: z.preprocess((v) => (v === "" ? undefined : v), z.string().optional()),

@@ -10,7 +10,7 @@ export function useAction() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  async function run<T = Record<string, unknown>>(url: string, method: "POST" | "PATCH" | "DELETE", body?: unknown) {
+  async function run<T = Record<string, unknown>>(url: string, method: "POST" | "PATCH" | "PUT" | "DELETE", body?: unknown) {
     setError(null);
     setPending(true);
     const result = await sendJson<T>(url, method, body);

@@ -1,5 +1,7 @@
 import { createDb, type Db } from "../src/lib/db";
 import { hashPassword } from "../src/modules/auth/password";
+import { nationalHolidays } from "../src/modules/sla/holidays";
+import { invalidateCalendarCache, slaOnCreate } from "../src/modules/sla/service";
 
 // Dados 100% fictícios. Nada aqui vem de uma empresa real.
 const TEAMS = ["Infraestrutura", "Suporte N1", "Sistemas"] as const;
@@ -29,6 +31,7 @@ export async function seed(db: Db): Promise<void> {
     }
   }
 
+  await seedSla(db);
   await seedDemo(db, teamIds);
 }
 
@@ -93,11 +96,16 @@ async function seedDemo(db: Db, teamIds: Map<string, string>): Promise<void> {
     });
   }
 
-  for (const [title, description, categoryName, priority, type, status] of DEMO_TICKETS) {
+  invalidateCalendarCache();
+  const HOUR = 3600_000;
+  for (const [index, [title, description, categoryName, priority, type, status]] of DEMO_TICKETS.entries()) {
     if (await db.ticket.findFirst({ where: { title, requesterId: requester.id } })) continue;
     const category = await db.category.findFirst({ where: { name: categoryName, parentId: null } });
+    // Datas espalhadas no passado: os mais antigos ainda abertos aparecem vencidos na demonstração.
+    const createdAt = new Date(Date.now() - index * 7 * HOUR);
     const ticket = await db.ticket.create({
       data: {
+        createdAt,
         title,
         description,
         priority,
@@ -109,8 +117,10 @@ async function seedDemo(db: Db, teamIds: Map<string, string>): Promise<void> {
         assigneeId: status === "NEW" ? null : agent.id,
         resolvedAt: status === "RESOLVED" || status === "CLOSED" ? new Date() : null,
         closedAt: status === "CLOSED" ? new Date() : null,
+        pausedAt: status === "PENDING" ? new Date(createdAt.getTime() + HOUR) : null,
       },
     });
+    await db.$transaction((tx) => slaOnCreate(tx, ticket.id, createdAt));
     await db.ticketEvent.create({
       data: { ticketId: ticket.id, actorId: requester.id, type: "CREATED", data: { number: ticket.number } },
     });
@@ -121,6 +131,30 @@ async function seedDemo(db: Db, teamIds: Map<string, string>): Promise<void> {
     }
   }
   void admin;
+}
+
+const SLA_POLICIES = [
+  { priority: "CRITICAL", firstResponseMinutes: 60, resolutionMinutes: 240 },
+  { priority: "HIGH", firstResponseMinutes: 120, resolutionMinutes: 480 },
+  { priority: "MEDIUM", firstResponseMinutes: 240, resolutionMinutes: 1440 },
+  { priority: "LOW", firstResponseMinutes: 480, resolutionMinutes: 2400 },
+] as const;
+
+/** Política padrão, expediente seg–sex 8h–18h e feriados nacionais do ano corrente e dos 2 seguintes. */
+async function seedSla(db: Db): Promise<void> {
+  for (const p of SLA_POLICIES) {
+    await db.slaPolicy.upsert({ where: { priority: p.priority }, update: {}, create: p });
+  }
+  for (const weekday of [1, 2, 3, 4, 5]) {
+    await db.businessHours.upsert({ where: { weekday }, update: {}, create: { weekday, startMinute: 480, endMinute: 1080 } });
+  }
+  const year = new Date().getFullYear();
+  for (const y of [year, year + 1, year + 2]) {
+    for (const h of nationalHolidays(y)) {
+      const date = new Date(`${h.date}T00:00:00Z`);
+      await db.holiday.upsert({ where: { date }, update: {}, create: { date, name: h.name } });
+    }
+  }
 }
 
 async function main() {

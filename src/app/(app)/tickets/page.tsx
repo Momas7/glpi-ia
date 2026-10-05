@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { SlaBadge } from "@/components/SlaBadge";
 import { PriorityBadge, StatusBadge } from "@/components/StatusBadges";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { STATUS_LABEL, formatDateTime } from "@/lib/labels";
 import { requireUser } from "@/lib/server-session";
+import { loadCalendar, slaState } from "@/modules/sla";
 import { listQuerySchema, listTickets } from "@/modules/tickets";
 
 export const metadata = { title: "Chamados · Chamados IA" };
@@ -22,16 +24,20 @@ export default async function TicketsPage({ searchParams }: { searchParams: SP }
     status: first(raw.status) || undefined,
     q: first(raw.q) || undefined,
     scope: first(raw.scope) || undefined,
+    sla: first(raw.sla) || undefined,
   });
   const query = parsed.success ? parsed.data : listQuerySchema.parse({});
-  const { items, total, page, pageSize } = await listTickets(user, query);
+  const [{ items, total, page, pageSize }, cal] = await Promise.all([listTickets(user, query), loadCalendar()]);
+  const now = new Date();
+  const isStaff = user.role !== "REQUESTER";
   const pages = Math.max(1, Math.ceil(total / pageSize));
 
-  const href = (p: number, scope: string | undefined = query.scope) => {
+  const href = (p: number, scope: string | undefined = query.scope, sla: string | undefined = query.sla) => {
     const sp = new URLSearchParams();
     if (query.q) sp.set("q", query.q);
     if (query.status) sp.set("status", query.status);
     if (scope) sp.set("scope", scope);
+    if (sla) sp.set("sla", sla);
     sp.set("page", String(p));
     return `/tickets?${sp}`;
   };
@@ -58,17 +64,34 @@ export default async function TicketsPage({ searchParams }: { searchParams: SP }
         {chips.map((c) => (
           <Link
             key={c.label}
-            href={href(1, c.scope)}
-            aria-current={query.scope === c.scope ? "page" : undefined}
-            className={buttonVariants({ size: "sm", variant: query.scope === c.scope ? "secondary" : "outline" })}
+            href={href(1, c.scope, undefined)}
+            aria-current={query.scope === c.scope && !query.sla ? "page" : undefined}
+            className={buttonVariants({ size: "sm", variant: query.scope === c.scope && !query.sla ? "secondary" : "outline" })}
           >
             {c.label}
           </Link>
         ))}
+        {isStaff &&
+          (
+            [
+              { label: "Vencendo", sla: "at_risk" },
+              { label: "Vencidos", sla: "breached" },
+            ] as const
+          ).map((c) => (
+            <Link
+              key={c.sla}
+              href={href(1, query.scope, c.sla)}
+              aria-current={query.sla === c.sla ? "page" : undefined}
+              className={buttonVariants({ size: "sm", variant: query.sla === c.sla ? "secondary" : "outline" })}
+            >
+              {c.label}
+            </Link>
+          ))}
       </nav>
 
       <form method="get" className="flex flex-wrap gap-2">
         {query.scope && <input type="hidden" name="scope" value={query.scope} />}
+        {query.sla && <input type="hidden" name="sla" value={query.sla} />}
         <Input name="q" defaultValue={query.q} placeholder="Buscar no título…" className="max-w-xs" />
         <select
           name="status"
@@ -94,6 +117,7 @@ export default async function TicketsPage({ searchParams }: { searchParams: SP }
             <TableHead>Título</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Prioridade</TableHead>
+            <TableHead>Prazo</TableHead>
             <TableHead>Solicitante</TableHead>
             <TableHead>Criado em</TableHead>
           </TableRow>
@@ -101,7 +125,7 @@ export default async function TicketsPage({ searchParams }: { searchParams: SP }
         <TableBody>
           {items.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+              <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                 Nenhum chamado encontrado.
               </TableCell>
             </TableRow>
@@ -119,6 +143,9 @@ export default async function TicketsPage({ searchParams }: { searchParams: SP }
               </TableCell>
               <TableCell>
                 <PriorityBadge priority={t.priority} />
+              </TableCell>
+              <TableCell>
+                <SlaBadge {...slaState(t, now, cal)} />
               </TableCell>
               <TableCell>{t.requester.name}</TableCell>
               <TableCell className="text-muted-foreground">{formatDateTime(t.createdAt)}</TableCell>

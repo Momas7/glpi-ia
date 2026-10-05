@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { escapeLike } from "@/lib/like";
 import { emitTicketEvent } from "@/modules/integrations";
+import { slaOnCreate, slaOnPriorityChange, slaOnStatusChange } from "@/modules/sla";
 import { can, type SessionUser } from "@/modules/auth";
 import type { CreateTicketInput, ListTicketsQuery, TicketStatus, UpdateTicketInput } from "./schemas";
 
@@ -109,9 +110,10 @@ export async function createTicket(actor: SessionUser, input: CreateTicketInput,
     await tx.ticketEvent.create({
       data: { ticketId: ticket.id, actorId: actor.id, type: "CREATED", data: { number: ticket.number, ...(origin ? { via: origin.apiKeyName } : {}) } },
     });
+    await slaOnCreate(tx, ticket.id, new Date());
     await emitTicketEvent(tx, "ticket.created", ticket.id);
     for (const hook of createdHooks) await hook(tx, ticket);
-    return ticket;
+    return tx.ticket.findUniqueOrThrow({ where: { id: ticket.id }, include });
   });
 }
 
@@ -138,6 +140,7 @@ async function applyFields(tx: Tx, actor: SessionUser, current: TicketWithRefs, 
   if (Object.keys(after).length === 0) return;
 
   await tx.ticket.update({ where: { id: current.id }, data: patch });
+  if (patch.priority && patch.priority !== current.priority) await slaOnPriorityChange(tx, current.id, new Date());
   await tx.ticketEvent.create({
     data: { ticketId: current.id, actorId: actor.id, type: "UPDATED", data: { before, after } as Prisma.InputJsonValue },
   });
@@ -165,6 +168,7 @@ async function applyStatus(tx: Tx, actor: SessionUser, current: TicketWithRefs, 
   await tx.ticketEvent.create({
     data: { ticketId: current.id, actorId: actor.id, type: "STATUS_CHANGED", data: { from: current.status, to } },
   });
+  await slaOnStatusChange(tx, current.id, current.status, to, now);
   await emitTicketEvent(tx, "ticket.status_changed", current.id, { from: current.status, to });
 }
 
@@ -194,6 +198,13 @@ export async function patchTicket(
   });
 }
 
+function slaWhere(sla: ListTicketsQuery["sla"], now: Date): Prisma.TicketWhereInput {
+  if (!sla) return {};
+  const open: Prisma.TicketWhereInput = { status: { notIn: ["RESOLVED", "CLOSED"] }, pausedAt: null };
+  if (sla === "breached") return { ...open, resolutionDue: { lt: now } };
+  return { ...open, slaWarnedAt: { not: null }, resolutionDue: { gte: now } };
+}
+
 function scopeWhere(actor: SessionUser, scope: ListTicketsQuery["scope"]): Prisma.TicketWhereInput {
   if (scope === "assigned") return { assigneeId: actor.id };
   if (scope === "team") return { teamId: { in: actor.teamIds } };
@@ -217,6 +228,7 @@ export async function listTickets(
       query.assigneeId ? { assigneeId: query.assigneeId } : {},
       query.q ? { title: { contains: escapeLike(query.q), mode: "insensitive" } } : {},
       scopeWhere(actor, query.scope),
+      slaWhere(query.sla, new Date()),
     ],
   };
   const db = getDb();
@@ -224,7 +236,10 @@ export async function listTickets(
     db.ticket.findMany({
       where,
       include,
-      orderBy: [{ createdAt: "desc" }, { number: "desc" }],
+      orderBy:
+        (query.order ?? (actor.role === "REQUESTER" ? "recent" : "due")) === "due"
+          ? [{ slaSortDue: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }, { number: "desc" }]
+          : [{ createdAt: "desc" }, { number: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),

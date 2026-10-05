@@ -56,4 +56,9 @@ describe("loadConfig", () => {
     const c = loadConfig({ ...base, N8N_WEBHOOK_URL: "", N8N_WEBHOOK_SECRET: "" });
     expect(c.N8N_WEBHOOK_URL).toBeUndefined();
   });
+
+  it("APP_TIMEZONE: padrão America/Sao_Paulo e fuso inválido é recusado", () => {
+    expect(loadConfig(base).APP_TIMEZONE).toBe("America/Sao_Paulo");
+    expect(() => loadConfig({ ...base, APP_TIMEZONE: "Marte/Olimpo" })).toThrowError(/APP_TIMEZONE/);
+  });
 });
