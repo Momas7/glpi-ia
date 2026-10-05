@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { instrument } from "@/lib/request-log";
 
 export const dynamic = "force-dynamic";
 
 const DB_TIMEOUT_MS = 2000;
 
-export async function GET() {
+export function GET(req: Request) {
+  return instrument(req, check);
+}
+
+async function check(): Promise<Response> {
   try {
     await Promise.race([
       getDb().$queryRaw`SELECT 1`,

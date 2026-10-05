@@ -7,12 +7,12 @@ import type { CategoryRow, TeamSlaRow, TrendRow, WeeklyRow } from "@/modules/das
 
 const EMPTY = "Sem dados no período";
 
-function Frame({ title, label, empty, children }: { title: string; label: string; empty: boolean; children: React.ReactNode }) {
+export function Frame({ title, label, empty, emptyText = EMPTY, children }: { title: string; label: string; empty: boolean; emptyText?: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-white/10 p-4">
       <h3 className="text-sm font-medium">{title}</h3>
       {empty ? (
-        <p className="py-10 text-center text-sm text-muted-foreground">{EMPTY}</p>
+        <p className="py-10 text-center text-sm text-muted-foreground">{emptyText}</p>
       ) : (
         <div role="img" aria-label={label}>
           {children}

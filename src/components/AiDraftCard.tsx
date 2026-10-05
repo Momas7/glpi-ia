@@ -69,7 +69,7 @@ export function AiDraftCard({
       setPending(false);
       return setError(errorMessage(posted));
     }
-    const removed = await sendJson(url, "DELETE");
+    const removed = await sendJson(`${url}?published=1`, "DELETE");
     setPending(false);
     if (!removed.ok) return setError(errorMessage(removed));
     router.refresh();
@@ -122,7 +122,7 @@ export function AiDraftCard({
         <Button size="sm" variant="outline" disabled={pending} onClick={generate}>
           Regenerar
         </Button>
-        <Button size="sm" variant="ghost" disabled={pending} onClick={discard}>
+        <Button size="sm" variant="ghost" disabled={pending} onClick={() => discard()}>
           Descartar
         </Button>
         {error && (

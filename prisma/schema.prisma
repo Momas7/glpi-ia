@@ -370,6 +370,8 @@ model AiSuggestion {
   decidedBy   User?              @relation(fields: [decidedById], references: [id])
   decidedAt   DateTime?
   createdAt   DateTime           @default(now())
+  /// Gerada pelo seed de demonstração.
+  demo        Boolean            @default(false)
 
   @@unique([ticketId, kind])
   @@index([status, kind])
@@ -392,6 +394,8 @@ model AiAuditLog {
   outcome      AiOutcome
   error        String?
   maskedInput  String?
+  /// Linha gerada pelo seed de demonstração (nunca uso real).
+  demo         Boolean   @default(false)
 
   @@index([createdAt])
   @@index([jobType, createdAt])
@@ -407,6 +411,8 @@ model TicketRating {
   stars     Int
   comment   String?
   createdAt DateTime @default(now())
+  /// Gerada pelo seed de demonstração.
+  demo      Boolean  @default(false)
 }
 
 /// Artigo da base de conhecimento. Só publicado entra no RAG.
@@ -474,4 +480,10 @@ model OpenTicketVector {
   contentHash String
   embedding   Unsupported("vector(768)")
   createdAt   DateTime                   @default(now())
+}
+
+/// Batimento do worker: a página de saúde sabe se ele está vivo.
+model WorkerHeartbeat {
+  service String   @id
+  beatAt  DateTime
 }

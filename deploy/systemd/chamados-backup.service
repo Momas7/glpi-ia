@@ -1,0 +1,8 @@
+[Unit]
+Description=Backup diário do Sistema de Chamados
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/glpi_IA
+EnvironmentFile=-%h/glpi_IA/.env.prod
+ExecStart=%h/glpi_IA/scripts/backup.sh

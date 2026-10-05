@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { can } from "@/modules/auth/can";
 import type { SessionUser } from "@/modules/auth/session";
+import { queryAiAssist, queryAiUsage, queryCsat, queryHasDemo, type AiAssistData, type AiUsageData, type CsatData } from "./ai-metrics";
 import { monthStarts, periodRange, type Period } from "./period";
 import {
   queryByCategory,
@@ -26,6 +27,12 @@ export interface DashboardData {
   byCategory: Awaited<ReturnType<typeof queryByCategory>>;
   slaByTeam: Awaited<ReturnType<typeof querySlaByTeam>>;
   trend: Awaited<ReturnType<typeof queryTrend>>;
+  csat: CsatData;
+  aiAssist: AiAssistData;
+  /** Uso e custo de IA: só o admin recebe (o líder nunca). */
+  aiUsage?: AiUsageData;
+  /** O período contém linhas geradas pelo seed de demonstração. */
+  hasDemoData: boolean;
   generatedAt: Date;
 }
 
@@ -60,7 +67,8 @@ export async function getDashboard(
   const period = filter.period ?? "this_month";
   const { scope, label } = await resolveScope(actor, filter.teamId);
 
-  const key = `${scope.teamIds === null ? "*" : [...scope.teamIds].sort().join(",")}|${period}|${label}`;
+  const isAdmin = actor.role === "ADMIN";
+  const key = `${scope.teamIds === null ? "*" : [...scope.teamIds].sort().join(",")}|${period}|${label}|${isAdmin ? "admin" : "equipe"}`;
   const hit = !now ? cache.get(key) : undefined;
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.data;
 
@@ -79,7 +87,14 @@ export async function getDashboard(
     querySlaByTeam(scope, range),
     queryTrend(scope, monthStarts(at, tz, 6), tz),
   ]);
-  const data: DashboardData = { period, scopeLabel: label, kpis, dueSoon, workload, weekly, byCategory, slaByTeam, trend, generatedAt: at };
+  const months = monthStarts(at, tz, 6);
+  const [csat, aiAssist, hasDemoData, aiUsage] = await Promise.all([
+    queryCsat(scope, range, months, tz),
+    queryAiAssist(scope, range),
+    queryHasDemo(scope, range, isAdmin),
+    isAdmin ? queryAiUsage(range, tz) : Promise.resolve(undefined),
+  ]);
+  const data: DashboardData = { period, scopeLabel: label, kpis, dueSoon, workload, weekly, byCategory, slaByTeam, trend, csat, aiAssist, aiUsage, hasDemoData, generatedAt: at };
   if (!now) cache.set(key, { at: Date.now(), data });
   return data;
 }

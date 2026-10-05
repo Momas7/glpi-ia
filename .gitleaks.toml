@@ -1,0 +1,8 @@
+title = "Sistema de Chamados"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Exemplos de variáveis de ambiente: só nomes, sem valores"
+paths = ['''^\.env(\.prod)?\.example$''']

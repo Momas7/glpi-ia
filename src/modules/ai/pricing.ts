@@ -5,6 +5,7 @@ const PRICES: { prefix: string; input: number; output: number }[] = [
   { prefix: "claude-haiku", input: 1, output: 5 },
   { prefix: "claude-sonnet", input: 3, output: 15 },
   { prefix: "claude-opus", input: 15, output: 75 },
+  { prefix: "gemini-3.8-flash", input: 0.3, output: 2.5 },
   { prefix: "gemini-2.5-flash", input: 0.3, output: 2.5 },
   { prefix: "gemini-2.5-pro", input: 1.25, output: 10 },
   { prefix: "gemini-embedding", input: 0.15, output: 0 },

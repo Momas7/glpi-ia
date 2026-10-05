@@ -6,6 +6,9 @@ describe("estimateCostUsd", () => {
     expect(estimateCostUsd("claude-haiku-4-5-20251001", 1_000_000, 1_000_000)).toBe(6);
     expect(estimateCostUsd("gemini-2.5-flash", 2_000_000, 0)).toBeCloseTo(0.6);
   });
+  it("o modelo de triagem padrão do Gemini tem preço próprio (não cai no mais caro)", () => {
+    expect(estimateCostUsd(defaultTriageModel("gemini"), 1_000_000, 1_000_000)).toBeCloseTo(2.8);
+  });
   it("modelo fake custa zero", () => {
     expect(estimateCostUsd("fake-triage", 1000, 1000)).toBe(0);
   });

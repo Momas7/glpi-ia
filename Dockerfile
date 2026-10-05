@@ -13,12 +13,18 @@ FROM deps AS build
 COPY . .
 RUN npx prisma generate && npm run build
 
+# ---- migrate: só o CLI do Prisma (com o motor de migração), para o `migrate deploy` na subida do web
+FROM base AS migrate
+ARG PRISMA_VERSION=7.10.0
+WORKDIR /migrate
+RUN npm init -y >/dev/null && npm install --no-audit --no-fund prisma@${PRISMA_VERSION}
+
 # ---- web: Next.js standalone + migrations na subida
 FROM base AS web
 ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
-# node_modules completo só para o `prisma migrate deploy` na subida (otimizar na Fase 6)
-COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/.next/standalone ./
+# o CLI do Prisma entra por cima do node_modules rastreado pelo standalone (sem copiar o node_modules do build inteiro)
+COPY --from=migrate --chown=node:node /migrate/node_modules ./node_modules
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 COPY --from=build /app/prisma ./prisma
