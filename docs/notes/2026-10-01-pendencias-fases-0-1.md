@@ -85,6 +85,17 @@ Registro do que ficou adiado nas revisões independentes e das decisões que mud
 - Menu lateral: `aria-controls` aponta para um id que não existe com o menu fechado; o Esc não devolve o foco ao botão.
 - Cache do dashboard sem despejo de entradas vencidas e sem proteção contra rajada simultânea.
 
+## Fase 3 (triagem por IA): menores adiados
+
+- "Editar" na sugestão permite mandar o chamado a qualquer equipe sem `ticket:assign` (aceitar a sugestão é intencional; o edit livre amplia o poder do técnico).
+- Tentativas multiplicadas: `runAi` tenta 3 vezes e a fila 3 vezes (até 12 chamadas); erros não retentáveis também voltam pela fila; chamada que falhou grava custo 0 mesmo tendo gasto tokens.
+- O texto é cortado antes da máscara: o corte no meio de um e-mail ou CPF deixa o pedaço em claro.
+- Máscara: telefone "11 9 8765-4321" não é pego; número de 10 dígitos vira TEL e versão "10.2.3.4" vira IP; o regex de e-mail é quadrático (ReDoS se usado sem limite de tamanho, ex.: Fase 4).
+- Teto diário não é atômico (workers em paralelo podem estourá-lo em até N chamadas).
+- IA ligada com `LLM_PROVIDER=fake` (o padrão) mostra sugestões por palavra-chave como "da IA"; avisar no painel ou recusar em produção.
+- Rota única `POST /api/tickets/[id]/ai/triage` com `action` no corpo, no lugar das três rotas do spec.
+- Qualidade real da triagem não medida (sem chave de API): rodar `npm run ai:eval` com Gemini e Claude.
+
 ## Dependências de desenvolvimento com aviso de segurança
 
 - `braces` (GHSA-vfj7-8cjw-p6xm, negação de serviço por padrões aninhados, severidade alta) não tem versão corrigida (a última, 3.0.3, é a afetada). Entra só por ferramentas de desenvolvimento (CLI do `shadcn` e `eslint-config-next`, via `fast-glob`/`micromatch`). O `shadcn` foi movido para `devDependencies` e o job `audit` do CI audita só as dependências de produção (`--omit=dev`). Rever quando houver versão corrigida do `braces` ou das ferramentas que o usam.

@@ -15,11 +15,14 @@
     "db:seed": "prisma db seed",
     "worker": "SERVICE_NAME=worker tsx --env-file-if-exists=.env --tsconfig tsconfig.json src/worker/index.ts",
     "test:e2e": "playwright test",
+    "ai:eval": "tsx --env-file-if-exists=.env scripts/ai-eval.mts",
     "admin:create": "tsx --env-file-if-exists=.env scripts/create-admin.mts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@base-ui/react": "^1.8.0",
     "@date-fns/tz": "^1.5.0",
+    "@google/genai": "^2.27.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "argon2": "^0.45.1",

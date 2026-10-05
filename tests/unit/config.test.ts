@@ -23,7 +23,7 @@ describe("loadConfig", () => {
 
   it("aplica os valores default", () => {
     const c = loadConfig(base);
-    expect(c.LLM_PROVIDER).toBe("gemini");
+    expect(c.LLM_PROVIDER).toBe("fake");
     expect(c.EMBEDDING_PROVIDER).toBe("gemini");
     expect(c.AI_ENABLED).toBe(false);
     expect(c.AI_DAILY_BUDGET).toBe(5);
@@ -32,6 +32,30 @@ describe("loadConfig", () => {
 
   it("rejeita LLM_PROVIDER desconhecido", () => {
     expect(() => loadConfig({ ...base, LLM_PROVIDER: "openai" })).toThrowError(/LLM_PROVIDER/);
+  });
+
+  it("aceita os providers fake, gemini e anthropic", () => {
+    for (const p of ["fake", "gemini", "anthropic"] as const) {
+      expect(loadConfig({ ...base, LLM_PROVIDER: p }).LLM_PROVIDER).toBe(p);
+    }
+  });
+
+  it("limiar de confiança da triagem: padrão 0.6 e valores entre 0 e 1", () => {
+    expect(loadConfig(base).AI_TRIAGE_MIN_CONFIDENCE).toBe(0.6);
+    expect(loadConfig({ ...base, AI_TRIAGE_MIN_CONFIDENCE: "0.8" }).AI_TRIAGE_MIN_CONFIDENCE).toBe(0.8);
+    expect(() => loadConfig({ ...base, AI_TRIAGE_MIN_CONFIDENCE: "1.5" })).toThrowError(/AI_TRIAGE_MIN_CONFIDENCE/);
+  });
+
+  it("retenção do log de IA: padrão 30 dias, mínimo 1", () => {
+    expect(loadConfig(base).AI_AUDIT_RETENTION_DAYS).toBe(30);
+    expect(() => loadConfig({ ...base, AI_AUDIT_RETENTION_DAYS: "0" })).toThrowError(/AI_AUDIT_RETENTION_DAYS/);
+  });
+
+  it("chaves de API vazias (como o Compose repassa) viram ausentes", () => {
+    const c = loadConfig({ ...base, GEMINI_API_KEY: "", ANTHROPIC_API_KEY: "", AI_MODEL_TRIAGE: "" });
+    expect(c.GEMINI_API_KEY).toBeUndefined();
+    expect(c.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(c.AI_MODEL_TRIAGE).toBeUndefined();
   });
 
   it("AUTO_CLOSE_DAYS tem padrão 7 e recusa valores menores que 1", () => {

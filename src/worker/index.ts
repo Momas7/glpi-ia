@@ -1,6 +1,7 @@
 import { getConfig } from "@/lib/config";
 import { logger } from "@/lib/logger";
 import { registerHandler, scheduleJob, stopQueue } from "@/lib/queue";
+import { registerAiJobs } from "@/modules/ai";
 import { registerWebhookQueues } from "@/modules/integrations";
 import { scanSla } from "@/modules/sla";
 import { autoCloseResolved } from "@/modules/tickets";
@@ -22,6 +23,7 @@ async function main() {
     await scanSla();
   });
   await scheduleJob("sla.scan", "*/5 * * * *"); // a cada 5 minutos
+  await registerAiJobs();
   logger.info("worker iniciado");
 
   const shutdown = async (signal: string) => {

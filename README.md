@@ -11,6 +11,7 @@ Sistema de chamados no estilo GLPI com automações de IA: triagem automática, 
 - **Stack:** TypeScript em Node.js 24 de ponta a ponta. Front em Next.js (App Router); API REST em Route Handlers do Next (Node); worker de jobs em Node com pg-boss (sem Redis); PostgreSQL com pgvector via Prisma; Tailwind, shadcn/ui e componentes React Bits.
 - **IA:** camada `LLMProvider` trocável por variável de ambiente (Gemini em desenvolvimento, Claude em produção).
 - **Integração com o n8n:** avisos assinados de tudo que acontece nos chamados e API para o n8n abrir chamados (ex.: e-mail vira chamado). Guia em [docs/integracao-n8n.md](docs/integracao-n8n.md).
+- **Triagem por IA:** cada chamado novo recebe uma sugestão de categoria, prioridade e equipe (Gemini em desenvolvimento, Claude em produção, trocados por uma variável). A IA só sugere, o técnico decide; dados sensíveis são mascarados antes de sair e tudo é auditado. Guia em [docs/ia.md](docs/ia.md).
 - **Segurança:** dados sensíveis mascarados antes do LLM, log de auditoria de toda chamada de IA, a IA nunca fecha chamado sozinha.
 
 ## Arquitetura
