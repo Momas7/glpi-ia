@@ -27,3 +27,14 @@ export async function enqueueIndexTicket(tx: PrismaTransaction, ticketId: string
   if (process.env.AI_ENABLED !== "true") return;
   await enqueue(AI_INDEX_TICKET_QUEUE, { ticketId }, { tx });
 }
+
+export const AI_DETECT_QUEUE = "ai.detect";
+
+/**
+ * Detecta duplicados e incidentes do chamado (gera o vetor do chamado aberto, ou o remove se foi encerrado).
+ * Enfileirado na criação e em toda mudança de status, na mesma transação.
+ */
+export async function enqueueDetect(tx: PrismaTransaction, ticketId: string): Promise<void> {
+  if (process.env.AI_ENABLED !== "true") return;
+  await enqueue(AI_DETECT_QUEUE, { ticketId }, { tx });
+}

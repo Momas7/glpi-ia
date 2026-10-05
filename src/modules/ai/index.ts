@@ -10,16 +10,22 @@ export { buildTriagePrompt, runTriage, triageOutputSchema } from "./triage";
 export { decideSuggestion, decisionSchema, type Decision } from "./decisions";
 export {
   getAiOverview,
+  dismissDuplicates,
+  duplicateTicketIds,
   getDraftView,
+  getDuplicatesView,
+  getSummaryView,
   getPendingTriage,
   pendingTriageTicketIds,
   requestReindex,
   setTeamAi,
   type AiOverview,
   type DraftView,
+  type DuplicatesView,
+  type SummaryView,
   type PendingTriage,
 } from "./overview";
-export { evaluateRetrieval, evaluateTriage, type EmbedFn, type EvalCase, type EvalReport, type RagCase, type RagReport } from "./eval";
+export { evaluateDuplicates, evaluateRetrieval, evaluateTriage, type DupPair, type DupReport, type EmbedFn, type EvalCase, type EvalReport, type RagCase, type RagReport } from "./eval";
 export { runEmbed, type EmbedDeps, type EmbedRequest, type EmbedResult } from "./embedding/run";
 export { getEmbeddingProvider } from "./embedding/factory";
 export { EMBEDDING_DIMENSIONS, type EmbeddingProvider } from "./embedding/types";
@@ -39,3 +45,9 @@ export {
   type DraftResult,
   type DraftSourceRef,
 } from "./draft";
+export { AI_DETECT_QUEUE } from "./enqueue";
+export { detectForTicket, findDuplicates, type DetectConfig, type DetectDeps, type DuplicateCandidate } from "./detect";
+export { closeFinishedIncidents, closeIncident, detectIncident, getIncidentNotice, getOpenIncidentBanner, listIncidents, type IncidentRow } from "./incidents";
+export { MIN_SUMMARY_COMMENTS, buildSummaryPrompt, summarizeTicket, summaryOutputSchema, type SummaryResult } from "./summary";
+export { enableIterativeScan, withIterativeScan } from "./embed-utils";
+export { refreshOpenVector } from "./open-vectors";

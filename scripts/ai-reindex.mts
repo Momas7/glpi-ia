@@ -13,5 +13,5 @@ if (!config.AI_ENABLED) {
 }
 console.log(`Provider de embeddings: ${config.EMBEDDING_PROVIDER} · modelo: ${config.AI_EMBEDDING_MODEL}`);
 const done = await reindexAll();
-console.log(`Pronto: ${done.articles} artigos e ${done.tickets} chamados indexados (os já atualizados foram pulados).`);
+console.log(`Pronto: ${done.articles} artigos, ${done.tickets} chamados resolvidos e ${done.openTickets} chamados abertos indexados (os já atualizados foram pulados).`);
 process.exit(0);

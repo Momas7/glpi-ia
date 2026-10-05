@@ -123,6 +123,31 @@ Registro do que ficou adiado nas revisões independentes e das decisões que mud
 - Estrelas: a seta muda a nota mas o foco não acompanha o rádio (padrão ARIA de radiogroup).
 - `reindexAll` aborta no primeiro erro não temporário e as novas tentativas voltam a parar no mesmo item.
 
+## Fase 5 (duplicados, incidentes e resumo): menores adiados
+
+- Os limiares padrão (0,85 e 0,75) são estimativas: só valem depois de rodar `npm run ai:eval:dup` com a chave real.
+- Duplicados só consideram a mesma equipe; um chamado que muda de equipe depois da triagem não é recomparado.
+- O incidente é decidido na chegada de cada chamado; se a cota de embeddings acabar no pico, o grupo só aparece quando algum chamado for reprocessado (hoje, só ao mudar o status do chamado).
+- A trava consultiva da detecção de incidente é global (uma por vez); em volume muito alto de chamados simultâneos pode virar gargalo.
+- O título do incidente é o do chamado mais antigo do conjunto; não há edição.
+- Chamado fechado continua ligado ao incidente (histórico), mas o aviso no chamado só aparece enquanto o incidente está aberto.
+- O resumo usa só o texto dos comentários; anexos e eventos do chamado não entram.
+- Sem limite de pedidos de resumo por usuário além do teto diário de gasto.
+- Reabrir um chamado que fazia parte de um incidente fechado não reabre o incidente.
+
+## Fase 5: revisão final e decisão de produto
+
+- **Decisão sua:** o título do incidente é o do chamado mais antigo do conjunto (mascarado) e aparece para todo gestor do grupo, mesmo de outra equipe, porque uma queda geral cruza equipes de propósito. Se quiser, o líder passa a ver só títulos de chamados que ele pode abrir (e um título genérico no resto).
+- Encerrar o incidente fecha o agrupamento por completo: chamados do grupo encerrado nunca mais entram em outro nem refazem o alarme; um incidente novo só nasce com chamados novos.
+- Corrida: `closeFinishedIncidents` roda fora da trava consultiva da detecção; um chamado novo pode, raramente, cair num grupo que fecha no mesmo instante.
+- A janela de 30 minutos é contada a partir do momento do job; se o provider ficar fora por mais de 30 minutos, o próprio chamado sai da janela e o incidente não é detectado.
+- Selo "Possível duplicado" na lista pode aparecer mesmo quando todos os candidatos já foram resolvidos (o cartão, não).
+- Qualquer mudança de status de chamado sem sugestão roda a busca de duplicados de novo (com a janela de 72 h a partir de agora).
+- Dois pedidos de resumo simultâneos cobram o modelo duas vezes e um deles pode falhar com erro de unicidade.
+- Editar título ou descrição não refaz o vetor do chamado aberto.
+- A faixa de incidente consulta, a cada página, todos os chamados de cada grupo aberto só para contar; o `role="alert"` repete o anúncio a cada navegação.
+- Casts `as never` em `getIncidentNotice` e `getDuplicatesView` escondem recursos incompletos do typecheck; `APP_URL` é lido de `process.env` direto.
+
 ## Dependências de desenvolvimento com aviso de segurança
 
 - `braces` (GHSA-vfj7-8cjw-p6xm, negação de serviço por padrões aninhados, severidade alta) não tem versão corrigida (a última, 3.0.3, é a afetada). Entra só por ferramentas de desenvolvimento (CLI do `shadcn` e `eslint-config-next`, via `fast-glob`/`micromatch`). O `shadcn` foi movido para `devDependencies` e o job `audit` do CI audita só as dependências de produção (`--omit=dev`). Rever quando houver versão corrigida do `braces` ou das ferramentas que o usam.

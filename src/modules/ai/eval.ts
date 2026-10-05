@@ -155,3 +155,63 @@ export async function evaluateRetrieval(
     failures,
   };
 }
+
+export interface DupPair {
+  a: string;
+  b: string;
+  /** Rótulo humano: os dois chamados tratam do mesmo problema? */
+  duplicate: boolean;
+}
+
+export interface DupReport {
+  total: number;
+  precision: number;
+  recall: number;
+  falsePositives: DupPair[];
+  missed: DupPair[];
+  /** Limiar com o melhor F1 entre 0,50 e 0,95 (em empate, o mais alto: o mais conservador). */
+  suggestedThreshold: number;
+}
+
+/**
+ * Mede quantos duplicados o limiar pega e quantos falsos alarmes gera, para calibrar
+ * `AI_DUPLICATE_MIN_SIMILARITY` e `AI_INCIDENT_MIN_SIMILARITY` com o provider real. Sem banco.
+ */
+export async function evaluateDuplicates(embed: EmbedFn, pairs: DupPair[], opts: { threshold?: number } = {}): Promise<DupReport> {
+  const threshold = opts.threshold ?? 0.85;
+  const vectors = await embed(pairs.flatMap((p) => [p.a, p.b]), "document");
+  const sims = pairs.map((_, i) => dot(vectors[2 * i], vectors[2 * i + 1]));
+
+  const score = (t: number) => {
+    let tp = 0;
+    let fp = 0;
+    let fn = 0;
+    pairs.forEach((p, i) => {
+      const predicted = sims[i] >= t;
+      if (predicted && p.duplicate) tp++;
+      else if (predicted) fp++;
+      else if (p.duplicate) fn++;
+    });
+    const precision = tp + fp === 0 ? 1 : tp / (tp + fp);
+    const recall = tp + fn === 0 ? 1 : tp / (tp + fn);
+    const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
+    return { precision, recall, f1 };
+  };
+
+  let best = { t: 0.5, f1: -1 };
+  for (let step = 50; step <= 95; step++) {
+    const t = step / 100;
+    const { f1 } = score(t);
+    if (f1 >= best.f1) best = { t, f1 }; // empate: fica o limiar mais alto
+  }
+
+  const { precision, recall } = score(threshold);
+  return {
+    total: pairs.length,
+    precision,
+    recall,
+    falsePositives: pairs.filter((p, i) => sims[i] >= threshold && !p.duplicate),
+    missed: pairs.filter((p, i) => sims[i] < threshold && p.duplicate),
+    suggestedThreshold: best.t,
+  };
+}

@@ -3,7 +3,8 @@ import { getDb } from "@/lib/db";
 import { ForbiddenError } from "@/lib/errors";
 import { can, type SessionUser } from "@/modules/auth";
 import { runEmbed, type EmbedDeps } from "./embedding/run";
-import { ticketSolution, toVectorLiteral } from "./indexing";
+import { enableIterativeScan, toVectorLiteral } from "./embed-utils";
+import { ticketSolution } from "./indexing";
 
 export type KnowledgeSource =
   | { kind: "article"; id: string; title: string; excerpt: string; similarity: number }
@@ -53,10 +54,7 @@ export async function searchKnowledge(
   const isAdmin = actor.role === "ADMIN";
 
   const { articles, tickets } = await db.$transaction(async (tx) => {
-    // Com filtros depois do índice HNSW, a busca precisa continuar procurando até achar linhas que passem (pgvector ≥ 0.8).
-    await tx.$queryRaw`SELECT '[1]'::vector`; // carrega a extensão, que define o parâmetro abaixo
-    const supported = await tx.$queryRaw<{ v: string | null }[]>`SELECT current_setting('hnsw.iterative_scan', true) AS v`;
-    if (supported[0]?.v !== null && supported[0]?.v !== undefined) await tx.$executeRawUnsafe(`SET LOCAL hnsw.iterative_scan = 'relaxed_order'`);
+    await enableIterativeScan(tx);
 
     const articles = await tx.$queryRaw<ArticleRow[]>`
       SELECT a."id" AS "articleId", a."title", c."text", 1 - (c."embedding" <=> ${vec}::vector) AS sim

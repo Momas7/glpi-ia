@@ -24,7 +24,7 @@ describe("configuração de deploy", () => {
   it("repassa a configuração de IA ao ambiente comum de web e worker", () => {
     // O bloco `&app-env` é compartilhado por web e worker (`*app-env`).
     expect(compose).toMatch(/worker:[\s\S]*environment: \*app-env/);
-    for (const name of ["AI_ENABLED", "LLM_PROVIDER", "GEMINI_API_KEY", "ANTHROPIC_API_KEY", "AI_DAILY_BUDGET", "AI_TRIAGE_MIN_CONFIDENCE", "AI_AUDIT_RETENTION_DAYS", "AI_MODEL_TRIAGE", "EMBEDDING_PROVIDER", "AI_EMBEDDING_MODEL", "AI_RAG_MIN_SIMILARITY", "AI_MODEL_DRAFT"]) {
+    for (const name of ["AI_ENABLED", "LLM_PROVIDER", "GEMINI_API_KEY", "ANTHROPIC_API_KEY", "AI_DAILY_BUDGET", "AI_TRIAGE_MIN_CONFIDENCE", "AI_AUDIT_RETENTION_DAYS", "AI_MODEL_TRIAGE", "EMBEDDING_PROVIDER", "AI_EMBEDDING_MODEL", "AI_RAG_MIN_SIMILARITY", "AI_MODEL_DRAFT", "AI_DUPLICATE_MIN_SIMILARITY", "AI_DUPLICATE_WINDOW_HOURS", "AI_INCIDENT_MIN_SIMILARITY", "AI_INCIDENT_WINDOW_MINUTES", "AI_INCIDENT_MIN_TICKETS", "AI_MODEL_SUMMARY"]) {
       expect(compose, name).toMatch(new RegExp(`${name}: \\$\\{${name}:-`));
     }
     expect(compose).toMatch(/LLM_PROVIDER: \$\{LLM_PROVIDER:-fake\}/);
@@ -55,6 +55,8 @@ describe("configuração de deploy", () => {
     expect(example).toMatch(/^AI_AUDIT_RETENTION_DAYS=30$/m);
     expect(example).toMatch(/^EMBEDDING_PROVIDER=fake$/m);
     expect(example).toMatch(/^AI_RAG_MIN_SIMILARITY=0.6$/m);
+    expect(example).toMatch(/^AI_INCIDENT_MIN_TICKETS=5$/m);
+    expect(example).toMatch(/^AI_DUPLICATE_MIN_SIMILARITY=0.85$/m);
   });
 
   it("inclui o texto da licença do React Bits junto dos componentes copiados", () => {
