@@ -2,6 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/lib/db";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { escapeLike } from "@/lib/like";
+import { emitTicketEvent } from "@/modules/integrations";
 import { can, type SessionUser } from "@/modules/auth";
 import type { CreateTicketInput, ListTicketsQuery, TicketStatus, UpdateTicketInput } from "./schemas";
 
@@ -32,6 +33,7 @@ export const ticketInclude = {
   assignee: { select: { id: true, name: true } },
   team: { select: { id: true, name: true } },
   category: { select: { id: true, name: true } },
+  apiKey: { select: { name: true } },
 } satisfies Prisma.TicketInclude;
 const include = ticketInclude;
 
@@ -67,7 +69,15 @@ export async function getTicket(actor: SessionUser, id: string): Promise<TicketW
   return ticket;
 }
 
-export async function createTicket(actor: SessionUser, input: CreateTicketInput): Promise<TicketWithRefs> {
+/** Origem do chamado quando não vem da tela: integração por chave de API (n8n). */
+export interface TicketOrigin {
+  source: "API";
+  apiKeyId: string;
+  apiKeyName: string;
+  externalRef?: string;
+}
+
+export async function createTicket(actor: SessionUser, input: CreateTicketInput, origin?: TicketOrigin): Promise<TicketWithRefs> {
   if (!can(actor, "ticket:create")) throw new ForbiddenError();
   const db = getDb();
   return db.$transaction(async (tx) => {
@@ -92,12 +102,14 @@ export async function createTicket(actor: SessionUser, input: CreateTicketInput)
         categoryId: input.categoryId,
         teamId,
         requesterId: actor.id,
+        ...(origin ? { source: origin.source, apiKeyId: origin.apiKeyId, externalRef: origin.externalRef } : {}),
       },
       include,
     });
     await tx.ticketEvent.create({
-      data: { ticketId: ticket.id, actorId: actor.id, type: "CREATED", data: { number: ticket.number } },
+      data: { ticketId: ticket.id, actorId: actor.id, type: "CREATED", data: { number: ticket.number, ...(origin ? { via: origin.apiKeyName } : {}) } },
     });
+    await emitTicketEvent(tx, "ticket.created", ticket.id);
     for (const hook of createdHooks) await hook(tx, ticket);
     return ticket;
   });
@@ -153,6 +165,7 @@ async function applyStatus(tx: Tx, actor: SessionUser, current: TicketWithRefs, 
   await tx.ticketEvent.create({
     data: { ticketId: current.id, actorId: actor.id, type: "STATUS_CHANGED", data: { from: current.status, to } },
   });
+  await emitTicketEvent(tx, "ticket.status_changed", current.id, { from: current.status, to });
 }
 
 export async function updateTicket(actor: SessionUser, id: string, patch: UpdateTicketInput): Promise<TicketWithRefs> {

@@ -10,6 +10,7 @@ Sistema de chamados no estilo GLPI com automações de IA: triagem automática, 
 
 - **Stack:** Next.js (App Router), PostgreSQL com pgvector, Prisma, pg-boss (sem Redis), Tailwind, shadcn/ui e componentes React Bits.
 - **IA:** camada `LLMProvider` trocável por variável de ambiente (Gemini em desenvolvimento, Claude em produção).
+- **Integração com o n8n:** avisos assinados de tudo que acontece nos chamados e API para o n8n abrir chamados (ex.: e-mail vira chamado). Guia em [docs/integracao-n8n.md](docs/integracao-n8n.md).
 - **Segurança:** dados sensíveis mascarados antes do LLM, log de auditoria de toda chamada de IA, a IA nunca fecha chamado sozinha.
 
 ## Arquitetura

@@ -50,6 +50,18 @@ Registro do que ficou adiado nas revisões independentes e das decisões que mud
 - Faltam testes do agendamento do worker e das rotas de reabrir/confirmar para outro solicitante.
 - Atribuição sem mudança ainda grava evento ASSIGNED.
 
+## Minor adiados (Fase 2.2, integração com o n8n)
+
+- Dois cliques em "Reenviar" ao mesmo tempo enfileiram o aviso duas vezes (o n8n deve descartar repetições por `X-Event-Id`).
+- A entrega segue redirects: com 301/302 o POST vira GET; com 307/308 a assinatura vai para outro host. Usar `redirect: "manual"`.
+- O corpo com token de convite/reset fica no pg-boss durante as retentativas (~1–2 h) e mais 1 h depois; um link de reset pode chegar já vencido.
+- Entregas presas em PENDING (worker parado) não aparecem na tela de falhas.
+- Entrega com concorrência 1: um n8n lento acumula atraso.
+- Requisições sem chave válida não têm limite antes da autenticação; `lastUsedAt` é gravado mesmo quando a resposta é 429.
+- "Revogar" chave de API não pede confirmação.
+- Trocar a chave do n8n quebra a idempotência por `externalRef` (reprocessar e-mails antigos duplica chamados).
+- Formato dos cabeçalhos do nó IMAP e do erro do HTTP Request no workflow de exemplo não foram verificados num n8n real.
+
 ## Decisões de produto/segurança não resolvidas
 
 - Bloqueio de conta por 5 falhas permite que terceiros bloqueiem um colega repetidamente (negação de serviço). Mitigar (bloqueio por IP+conta, atraso progressivo) é decisão de produto.

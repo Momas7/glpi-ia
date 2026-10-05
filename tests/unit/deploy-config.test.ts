@@ -16,6 +16,11 @@ describe("configuração de deploy", () => {
     expect(compose).toMatch(/127\.0\.0\.1:3000:3000/);
   });
 
+  it("repassa a configuração do n8n aos containers web e worker", () => {
+    expect(compose).toMatch(/N8N_WEBHOOK_URL: \$\{N8N_WEBHOOK_URL:-\}/);
+    expect(compose).toMatch(/N8N_WEBHOOK_SECRET: \$\{N8N_WEBHOOK_SECRET:-\}/);
+  });
+
   it("não traz a senha do banco fixa no repositório", () => {
     expect(compose).not.toMatch(/glpi:glpi@/);
     expect(compose).not.toMatch(/POSTGRES_PASSWORD:\s*glpi\b/);

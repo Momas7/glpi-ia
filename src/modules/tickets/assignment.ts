@@ -2,6 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/lib/db";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { can, type SessionUser } from "@/modules/auth";
+import { emitTicketEvent } from "@/modules/integrations";
 import type { AssignTicketInput } from "./schemas";
 import { loadVisible, ticketInclude, type TicketWithRefs } from "./service";
 
@@ -43,6 +44,7 @@ export async function assignTicket(actor: SessionUser, id: string, input: Assign
         },
       },
     });
+    await emitTicketEvent(tx, "ticket.assigned", id, { previousAssigneeId: current.assigneeId });
     return updated;
   });
 }
@@ -66,6 +68,7 @@ export async function takeTicket(actor: SessionUser, id: string): Promise<Ticket
         data: { before: { assigneeId: null }, after: { assigneeId: actor.id }, via: "take" },
       },
     });
+    await emitTicketEvent(tx, "ticket.assigned", id, { previousAssigneeId: null });
     return tx.ticket.findUniqueOrThrow({ where: { id }, include: ticketInclude });
   });
 }
@@ -113,5 +116,6 @@ export async function releaseAssignments(
       data: { before: { assigneeId: input.userId }, after: { assigneeId: null }, via: "admin" },
     })),
   });
+  for (const t of tickets) await emitTicketEvent(tx, "ticket.assigned", t.id, { previousAssigneeId: input.userId });
   return tickets.length;
 }
