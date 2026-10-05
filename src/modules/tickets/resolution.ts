@@ -4,6 +4,7 @@ import { AppError, ForbiddenError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { can, type SessionUser } from "@/modules/auth";
 import { emitCommentEvent, emitTicketEvent } from "@/modules/integrations";
+import { slaOnStatusChange } from "@/modules/sla";
 import { loadVisible, ticketInclude, type TicketWithRefs } from "./service";
 
 export const reopenSchema = z.object({ reason: z.string().trim().min(5).max(2000) });
@@ -34,6 +35,7 @@ export async function reopenTicket(actor: SessionUser, id: string, reason: strin
     await tx.ticketEvent.create({
       data: { ticketId: id, actorId: actor.id, type: "REOPENED", data: { commentId: comment.id } },
     });
+    await slaOnStatusChange(tx, id, "RESOLVED", "OPEN", new Date());
     await emitTicketEvent(tx, "ticket.status_changed", id, { from: "RESOLVED", to: "OPEN" });
     await emitCommentEvent(tx, id, comment.id, { name: actor.name, email: actor.email });
     return tx.ticket.findUniqueOrThrow({ where: { id }, include: ticketInclude });

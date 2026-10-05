@@ -7,7 +7,7 @@ export interface ApiResult<T = Record<string, unknown>> {
 /** Chamada JSON do navegador para as rotas /api. O Origin é enviado automaticamente pelo navegador. */
 export async function sendJson<T = Record<string, unknown>>(
   url: string,
-  method: "POST" | "PATCH" | "DELETE",
+  method: "POST" | "PATCH" | "PUT" | "DELETE",
   body?: unknown,
 ): Promise<ApiResult<T>> {
   const res = await fetch(url, {

@@ -13,12 +13,16 @@ export type AuditAction =
   | "category.create"
   | "category.update"
   | "apikey.create"
-  | "apikey.revoke";
+  | "apikey.revoke"
+  | "sla.policy_update"
+  | "sla.hours_update"
+  | "holiday.create"
+  | "holiday.delete";
 
 export interface AuditEntry {
   actorId: string;
   action: AuditAction;
-  targetType: "user" | "invite" | "team" | "category" | "apikey";
+  targetType: "user" | "invite" | "team" | "category" | "apikey" | "sla";
   targetId: string;
   data?: Record<string, unknown>;
 }

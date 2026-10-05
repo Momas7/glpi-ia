@@ -62,6 +62,16 @@ Registro do que ficou adiado nas revisões independentes e das decisões que mud
 - Trocar a chave do n8n quebra a idempotência por `externalRef` (reprocessar e-mails antigos duplica chamados).
 - Formato dos cabeçalhos do nó IMAP e do erro do HTTP Request no workflow de exemplo não foram verificados num n8n real.
 
+## Minor adiados (Fase 2.3, SLA)
+
+- A varredura de SLA não reconfere status, pausa e prazo ao marcar: um chamado resolvido no meio da varredura pode receber alerta.
+- Mudar expediente ou feriados não recalcula prazos já gravados (só a política é congelada pelo spec; o restante deveria acompanhar).
+- O cache do calendário é invalidado só no processo que recebeu a mudança; o worker usa o antigo por até 5 min.
+- `businessMinutesBetween` anda dia a dia: chamados vencidos há muito tempo custam CPU na lista.
+- O texto "1 dia útil" do badge assume 10 h de expediente.
+- Feriado com data inexistente (ex.: 2026-02-30) enviado pela API vira outra data.
+- Testes: pausa só com `pausedAt` preenchido à mão; teste de horário de verão fora do expediente; total fixo de feriados no teste do seed; E2E "Vencidos" depende da hora.
+
 ## Decisões de produto/segurança não resolvidas
 
 - Bloqueio de conta por 5 falhas permite que terceiros bloqueiem um colega repetidamente (negação de serviço). Mitigar (bloqueio por IP+conta, atraso progressivo) é decisão de produto.
