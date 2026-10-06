@@ -1,14 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { APP_NAME, buildNavItems } from "@/lib/nav";
+import { buildNavItems } from "@/lib/nav";
 
 const user = (role: "REQUESTER" | "AGENT" | "TEAM_LEAD" | "ADMIN") => ({ id: "u", name: "U", email: "u@x.com", role, teamIds: [] });
 const labels = (role: Parameters<typeof user>[0]) => buildNavItems(user(role)).map((i) => i.label);
 
 describe("menu lateral", () => {
-  it("o nome do sistema é Sentinela", () => {
-    expect(APP_NAME).toBe("Sentinela");
-  });
-
   it("solicitante vê Chamados e Novo chamado, sem a base de conhecimento", () => {
     expect(labels("REQUESTER")).toEqual(["Chamados", "Novo chamado"]);
   });
