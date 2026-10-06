@@ -52,18 +52,3 @@ Rode também `npm run db:seed` (sem `SEED_DEMO_PASSWORD`): ele cria a equipe de 
 
 Notas para o ambiente real: o `web` só escuta em `127.0.0.1:3000` e deve ficar atrás de um proxy com HTTPS (Caddy, na Fase 6); o cookie de sessão é `Secure`, então acessar por `http://servidor:3000` não mantém o login. `TRUSTED_PROXY_HOPS` diz quantos proxies seus existem na frente (padrão 1). Não use `SEED_DEMO_PASSWORD` em produção.
 
-## Fases
-
-| Fase | Entrega | Status |
-|---|---|---|
-| 0 | Setup: Compose, Prisma, CI, tema | concluída |
-| 1 | Auth e CRUD de chamados | concluída |
-| 2 | SLA, equipes, e-mail e dashboard | planejada |
-| 3 | LLMProvider e triagem | planejada |
-| 4 | RAG e sugestão de resposta | planejada |
-| 5 | Resumo e duplicados | planejada |
-| 6 | Métricas de IA e deploy | planejada |
-
-## Licença
-
-MIT, exceto `src/components/bits/` (React Bits). Veja [LICENSE](LICENSE) e [THIRD_PARTY.md](THIRD_PARTY.md).
