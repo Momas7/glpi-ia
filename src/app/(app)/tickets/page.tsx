@@ -182,7 +182,7 @@ export default async function TicketsPage({ searchParams }: { searchParams: SP }
                 name="q"
                 defaultValue={query.q}
                 placeholder="Buscar no título…"
-                aria-label="Buscar no título"
+                aria-label="Pesquisar na lista"
                 className="h-8 w-48 rounded-l-md border border-r-0 border-white/10 bg-background px-2.5 text-xs outline-none focus:border-white/25"
               />
               <button type="submit" aria-label="Filtrar" className="grid h-8 w-9 place-items-center rounded-r-md border border-white/10 bg-white/[0.06] hover:bg-white/10">
