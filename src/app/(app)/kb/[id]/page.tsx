@@ -10,7 +10,7 @@ import { requireUser } from "@/lib/server-session";
 import { can } from "@/modules/auth";
 import { getArticle } from "@/modules/kb";
 
-export const metadata = { title: "Artigo · Sistema de Chamados" };
+export const metadata = { title: "Artigo · Sentinela" };
 
 export default async function KbArticlePage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();

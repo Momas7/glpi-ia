@@ -9,7 +9,7 @@ import { requireUser } from "@/lib/server-session";
 import { can } from "@/modules/auth";
 import { listArticles } from "@/modules/kb";
 
-export const metadata = { title: "Base de conhecimento · Sistema de Chamados" };
+export const metadata = { title: "Base de conhecimento · Sentinela" };
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 

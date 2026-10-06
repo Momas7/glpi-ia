@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/server-session";
 import { can } from "@/modules/auth";
 import { getArticle } from "@/modules/kb";
 
-export const metadata = { title: "Editar artigo · Sistema de Chamados" };
+export const metadata = { title: "Editar artigo · Sentinela" };
 
 export default async function EditKbArticlePage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();

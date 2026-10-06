@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/server-session";
 import { listIncidents, type IncidentRow } from "@/modules/ai";
 import { can } from "@/modules/auth";
 
-export const metadata = { title: "Incidentes · Sistema de Chamados" };
+export const metadata = { title: "Incidentes · Sentinela" };
 
 function IncidentCard({ incident, closable }: { incident: IncidentRow; closable: boolean }) {
   const hidden = incident.ticketCount - incident.tickets.length;

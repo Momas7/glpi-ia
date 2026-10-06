@@ -20,7 +20,7 @@ import { can } from "@/modules/auth";
 import { loadCalendar, slaState } from "@/modules/sla";
 import { RATING_WINDOW_DAYS, TRANSITIONS, getComments, getRating, getTicket, listAssignmentOptions, listAttachments } from "@/modules/tickets";
 
-export const metadata = { title: "Chamado · Sistema de Chamados" };
+export const metadata = { title: "Chamado · Sentinela" };
 
 export default async function TicketPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();

@@ -1,5 +1,5 @@
 [Unit]
-Description=Backup diário do Sistema de Chamados, às 2h
+Description=Backup diário do Sentinela, às 2h
 
 [Timer]
 OnCalendar=*-*-* 02:00:00

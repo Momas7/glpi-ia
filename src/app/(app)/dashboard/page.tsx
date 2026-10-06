@@ -13,7 +13,7 @@ import { assertDashboardPage } from "@/lib/dashboard-guard";
 import { requireUser } from "@/lib/server-session";
 import { getDashboard, PERIODS } from "@/modules/dashboard";
 
-export const metadata = { title: "Dashboard · Sistema de Chamados" };
+export const metadata = { title: "Dashboard · Sentinela" };
 
 const querySchema = z.object({
   team: z.string().min(1).optional().catch(undefined),

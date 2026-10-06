@@ -3,7 +3,7 @@ import { KbArticleForm } from "@/components/forms/KbArticleForm";
 import { requireUser } from "@/lib/server-session";
 import { can } from "@/modules/auth";
 
-export const metadata = { title: "Novo artigo · Sistema de Chamados" };
+export const metadata = { title: "Novo artigo · Sentinela" };
 
 export default async function NewKbArticlePage() {
   const user = await requireUser();
