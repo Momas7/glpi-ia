@@ -1,7 +1,7 @@
 import { can } from "@/modules/auth/can";
 import type { SessionUser } from "@/modules/auth/session";
 
-export const APP_NAME = "Sistema de Chamados";
+export const APP_NAME = "Sentinela";
 
 export interface NavItem {
   href: string;

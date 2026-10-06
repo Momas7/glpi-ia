@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { JsonForm } from "@/components/forms/JsonForm";
 import { getCurrentUser } from "@/lib/server-session";
 
-export const metadata = { title: "Entrar · Sistema de Chamados" };
+export const metadata = { title: "Entrar · Sentinela" };
 
 export default async function LoginPage() {
   if (await getCurrentUser()) redirect("/tickets");

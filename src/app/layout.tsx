@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sistema de Chamados",
+  title: "Sentinela",
   description: "Sistema de chamados com IA (estilo GLPI)",
 };
 

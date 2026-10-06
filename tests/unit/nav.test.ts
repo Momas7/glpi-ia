@@ -5,8 +5,8 @@ const user = (role: "REQUESTER" | "AGENT" | "TEAM_LEAD" | "ADMIN") => ({ id: "u"
 const labels = (role: Parameters<typeof user>[0]) => buildNavItems(user(role)).map((i) => i.label);
 
 describe("menu lateral", () => {
-  it("o nome do sistema é Sistema de Chamados", () => {
-    expect(APP_NAME).toBe("Sistema de Chamados");
+  it("o nome do sistema é Sentinela", () => {
+    expect(APP_NAME).toBe("Sentinela");
   });
 
   it("solicitante vê Chamados e Novo chamado, sem a base de conhecimento", () => {

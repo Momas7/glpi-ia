@@ -19,7 +19,7 @@ const props = { items, userName: "Ana Souza", roleLabel: "Administrador" };
 describe("AppSidebar", () => {
   it("mostra o nome do sistema, os itens, a pessoa e o botão Sair", () => {
     render(<AppSidebar {...props} />);
-    expect(screen.getAllByText("Sistema de Chamados").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Sentinela").length).toBeGreaterThan(0);
     for (const i of items) expect(screen.getAllByRole("link", { name: i.label }).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Ana Souza").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Administrador").length).toBeGreaterThan(0);
