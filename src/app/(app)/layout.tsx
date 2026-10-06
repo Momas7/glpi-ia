@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/AppSidebar";
+import { AppTopbar } from "@/components/AppTopbar";
 import { IncidentBanner } from "@/components/IncidentBanner";
 import { ROLE_LABEL } from "@/lib/labels";
 import { buildNavItems } from "@/lib/nav";
@@ -12,12 +13,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen flex-1 flex-col md:flex-row">
       <AppSidebar items={buildNavItems(user)} userName={user.name} roleLabel={ROLE_LABEL[user.role]} />
-      <main className="min-w-0 flex-1 p-6">
-        <div className="mx-auto w-full max-w-6xl">
-          <IncidentBanner incidents={incidents} />
-          {children}
-        </div>
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <AppTopbar />
+        <main className="flex-1 p-4 md:p-6">
+          <div className="mx-auto w-full max-w-[1600px]">
+            <IncidentBanner incidents={incidents} />
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

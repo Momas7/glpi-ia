@@ -229,6 +229,14 @@ function scopeWhere(actor: SessionUser, scope: ListTicketsQuery["scope"]): Prism
   return {};
 }
 
+/** Quantos chamados visíveis a quem pergunta há em cada status (cards do topo da lista). */
+export async function countTicketsByStatus(actor: SessionUser): Promise<Record<TicketStatus, number>> {
+  const rows = await getDb().ticket.groupBy({ by: ["status"], where: visibilityWhere(actor), _count: { _all: true } });
+  const counts: Record<TicketStatus, number> = { NEW: 0, OPEN: 0, PENDING: 0, RESOLVED: 0, CLOSED: 0 };
+  for (const r of rows) counts[r.status] = r._count._all;
+  return counts;
+}
+
 export async function listTickets(
   actor: SessionUser,
   query: ListTicketsQuery,
