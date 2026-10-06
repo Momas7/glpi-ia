@@ -2,7 +2,7 @@
 
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Frame } from "@/components/dashboard/Charts";
-import { formatInt, formatUsd } from "@/components/dashboard/format";
+import { formatInt, formatUsd, formatUsdTick } from "@/components/dashboard/format";
 import { Stat } from "@/components/dashboard/Stat";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -31,7 +31,7 @@ export function AiUsageSection({ usage }: { usage: AiUsageData }) {
           <BarChart data={usage.costByDay}>
             <CartesianGrid vertical={false} />
             <XAxis dataKey="day" tickFormatter={(d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`} tickLine={false} axisLine={false} />
-            <YAxis width={44} tickFormatter={(v: number) => v.toFixed(2)} tickLine={false} axisLine={false} />
+            <YAxis width={64} tickFormatter={formatUsdTick} tickLine={false} axisLine={false} />
             <ChartTooltip content={<ChartTooltipContent />} />
             <Bar dataKey="costUsd" fill="var(--color-costUsd)" radius={3} isAnimationActive={animate} />
           </BarChart>

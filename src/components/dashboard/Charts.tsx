@@ -79,7 +79,7 @@ export function TeamSlaChart({ data }: { data: TeamSlaRow[] }) {
         <BarChart data={data.map((d) => ({ ...d, percent: d.percent ?? 0 }))}>
           <CartesianGrid vertical={false} />
           <XAxis dataKey="team" tickLine={false} axisLine={false} />
-          <YAxis domain={[0, 100]} width={32} tickFormatter={(v) => `${v}%`} tickLine={false} axisLine={false} />
+          <YAxis domain={[0, 100]} width={44} tickFormatter={(v) => `${v}%`} tickLine={false} axisLine={false} />
           <ChartTooltip content={<ChartTooltipContent />} />
           <Bar dataKey="percent" fill="var(--color-percent)" radius={3} isAnimationActive={animate} />
         </BarChart>
@@ -102,7 +102,7 @@ export function TrendChart({ data }: { data: TrendRow[] }) {
           <CartesianGrid vertical={false} />
           <XAxis dataKey="month" tickFormatter={monthLabel} tickLine={false} axisLine={false} />
           <YAxis yAxisId="left" allowDecimals={false} width={28} tickLine={false} axisLine={false} />
-          <YAxis yAxisId="right" orientation="right" domain={[0, 100]} width={36} tickFormatter={(v) => `${v}%`} tickLine={false} axisLine={false} />
+          <YAxis yAxisId="right" orientation="right" domain={[0, 100]} width={44} tickFormatter={(v) => `${v}%`} tickLine={false} axisLine={false} />
           <ChartTooltip content={<ChartTooltipContent />} />
           <ChartLegend content={<ChartLegendContent />} />
           <Bar yAxisId="left" dataKey="created" fill="var(--color-created)" radius={3} isAnimationActive={animate} />
