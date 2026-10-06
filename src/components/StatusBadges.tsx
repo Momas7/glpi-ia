@@ -15,8 +15,22 @@ const PRIORITY_STYLE: Record<string, string> = {
   CRITICAL: "bg-red-500/20 text-red-300",
 };
 
+// Bolinha à moda do GLPI: cheia para novo, vazada para em atendimento, etc.
+const STATUS_DOT: Record<string, string> = {
+  NEW: "bg-sky-400",
+  OPEN: "border-2 border-indigo-400",
+  PENDING: "bg-amber-400",
+  RESOLVED: "border-2 border-emerald-400",
+  CLOSED: "bg-zinc-500",
+};
+
+export const StatusDot = ({ status, className = "size-2" }: { status: string; className?: string }) => (
+  <span aria-hidden className={`shrink-0 rounded-full ${className} ${STATUS_DOT[status]}`} />
+);
+
 export const StatusBadge = ({ status }: { status: string }) => (
   <Badge variant="outline" className={`border-0 ${STATUS_STYLE[status]}`}>
+    <StatusDot status={status} />
     {STATUS_LABEL[status]}
   </Badge>
 );

@@ -4,6 +4,7 @@ export {
   TRANSITIONS,
   TicketNotFoundError,
   changeStatus,
+  countTicketsByStatus,
   createTicket,
   getTicket,
   listTickets,
