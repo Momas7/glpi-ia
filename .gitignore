@@ -60,3 +60,4 @@ next-env.d.ts
 # arquivos gerados por ferramentas de desenvolvimento
 /CLAUDE.md
 /AGENTS.md
+/.claude/
