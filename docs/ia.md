@@ -1,4 +1,4 @@
-# IA no Sistema de Chamados
+# IA no Sentinela
 
 A IA **só sugere**. Ela nunca muda o status de um chamado, nunca fecha nada e nunca aplica uma mudança sem um clique de uma pessoa.
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=Teste de restauração do último backup do Sistema de Chamados
+Description=Teste de restauração do último backup do Sentinela
 After=chamados-backup.service
 
 [Service]

@@ -1,5 +1,5 @@
 [Unit]
-Description=Backup diário do Sistema de Chamados
+Description=Backup diário do Sentinela
 
 [Service]
 Type=oneshot

@@ -1,6 +1,6 @@
 # Operação: produção local
 
-Este roteiro sobe o Sistema de Chamados "em produção" na sua própria máquina: HTTPS local, banco com backup e teste de restauração. Não há domínio nem servidor; tudo roda em contêineres no seu computador.
+Este roteiro sobe o Sentinela "em produção" na sua própria máquina: HTTPS local, banco com backup e teste de restauração. Não há domínio nem servidor; tudo roda em contêineres no seu computador.
 
 ```
 navegador ──https://localhost:8443──► Caddy ──► web (Next.js) ──► Postgres (pgvector)

@@ -11,7 +11,7 @@ import { duplicateTicketIds, pendingTriageTicketIds } from "@/modules/ai";
 import { loadCalendar, slaState } from "@/modules/sla";
 import { listQuerySchema, listTickets } from "@/modules/tickets";
 
-export const metadata = { title: "Chamados · Sistema de Chamados" };
+export const metadata = { title: "Chamados · Sentinela" };
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
